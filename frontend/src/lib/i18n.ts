@@ -8,7 +8,7 @@ i18n
   .use(initReactI18next)
   .init({
     resources,
-    fallbackLng: 'en-US',
+    fallbackLng: 'es-ES',
     interpolation: {
       escapeValue: false, // react already safes from xss
     },
