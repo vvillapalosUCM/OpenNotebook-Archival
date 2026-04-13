@@ -143,3 +143,5 @@ specs/
 
 .mcp.jsondeployment/windows/runtime/
 deployment/windows/backups/
+deployment/windows/runtime/
+deployment/windows/backups/
