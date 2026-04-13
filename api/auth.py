@@ -23,6 +23,13 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
+def _env_bool(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name, "").strip().lower()
+    if not raw:
+        return default
+    return raw in {"1", "true", "yes", "on"}
+
+
 class PasswordAuthMiddleware(BaseHTTPMiddleware):
     """
     Middleware to check password authentication for all API requests.
@@ -30,7 +37,8 @@ class PasswordAuthMiddleware(BaseHTTPMiddleware):
     Hardening added in the archival fork:
     - constant-time password comparison;
     - simple in-memory rate limiting per client IP;
-    - optional temporary blocking after repeated failures.
+    - optional temporary blocking after repeated failures;
+    - optional trust of proxy headers only when explicitly enabled.
     """
 
     def __init__(self, app, excluded_paths: Optional[list] = None):
@@ -47,13 +55,15 @@ class PasswordAuthMiddleware(BaseHTTPMiddleware):
         self.window_seconds = _env_int("OPEN_NOTEBOOK_AUTH_WINDOW_SECONDS", 300)
         self.block_seconds = _env_int("OPEN_NOTEBOOK_AUTH_BLOCK_SECONDS", 600)
         self.failure_delay_ms = _env_int("OPEN_NOTEBOOK_AUTH_FAILURE_DELAY_MS", 400)
+        self.trust_proxy_headers = _env_bool("OPEN_NOTEBOOK_TRUST_PROXY_HEADERS", False)
         self.failed_attempts: dict[str, list[float]] = {}
         self.blocked_until: dict[str, float] = {}
 
     def _client_ip(self, request: Request) -> str:
-        forwarded_for = request.headers.get("x-forwarded-for", "").strip()
-        if forwarded_for:
-            return forwarded_for.split(",")[0].strip()
+        if self.trust_proxy_headers:
+            forwarded_for = request.headers.get("x-forwarded-for", "").strip()
+            if forwarded_for:
+                return forwarded_for.split(",")[0].strip()
         if request.client and request.client.host:
             return request.client.host
         return "unknown"
