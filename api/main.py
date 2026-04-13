@@ -1,8 +1,8 @@
-# Load environment variables
 from dotenv import load_dotenv
 
 load_dotenv()
 
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -12,16 +12,6 @@ from loguru import logger
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from api.auth import PasswordAuthMiddleware
-from open_notebook.exceptions import (
-    AuthenticationError,
-    ConfigurationError,
-    ExternalServiceError,
-    InvalidInputError,
-    NetworkError,
-    NotFoundError,
-    OpenNotebookError,
-    RateLimitError,
-)
 from api.routers import (
     auth,
     chat,
@@ -46,35 +36,77 @@ from api.routers import (
 )
 from api.routers import commands as commands_router
 from open_notebook.database.async_migrate import AsyncMigrationManager
+from open_notebook.exceptions import (
+    AuthenticationError,
+    ConfigurationError,
+    ExternalServiceError,
+    InvalidInputError,
+    NetworkError,
+    NotFoundError,
+    OpenNotebookError,
+    RateLimitError,
+)
 from open_notebook.utils.encryption import get_secret_from_env
 
-# Import commands to register them in the API process
 try:
     logger.info("Commands imported in API process")
 except Exception as e:
     logger.error(f"Failed to import commands in API process: {e}")
 
 
+def _parse_allowed_origins() -> list[str]:
+    raw = os.environ.get("OPEN_NOTEBOOK_ALLOWED_ORIGINS", "").strip()
+    if raw:
+        return [origin.strip() for origin in raw.split(",") if origin.strip()]
+    return [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8502",
+        "http://127.0.0.1:8502",
+    ]
+
+
+def _public_docs_enabled() -> bool:
+    return os.environ.get("OPEN_NOTEBOOK_PUBLIC_DOCS", "false").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+ALLOWED_ORIGINS = _parse_allowed_origins()
+PUBLIC_DOCS_ENABLED = _public_docs_enabled()
+
+
+def _build_auth_excluded_paths() -> list[str]:
+    excluded = ["/", "/health", "/api/auth/status", "/api/config"]
+    if PUBLIC_DOCS_ENABLED:
+        excluded.extend(["/docs", "/openapi.json", "/redoc"])
+    return excluded
+
+
+def _cors_headers(request: Request) -> dict[str, str]:
+    origin = request.headers.get("origin")
+    if origin and origin in ALLOWED_ORIGINS:
+        return {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": "*",
+            "Access-Control-Allow-Headers": "*",
+            "Vary": "Origin",
+        }
+    return {}
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Lifespan event handler for the FastAPI application.
-    Runs database migrations automatically on startup.
-    """
-    import os
-
-    # Startup: Security checks
     logger.info("Starting API initialization...")
 
-    # Security check: Encryption key
     if not get_secret_from_env("OPEN_NOTEBOOK_ENCRYPTION_KEY"):
         logger.warning(
-            "OPEN_NOTEBOOK_ENCRYPTION_KEY not set. "
-            "API key encryption will fail until this is configured. "
-            "Set OPEN_NOTEBOOK_ENCRYPTION_KEY to any secret string."
+            "OPEN_NOTEBOOK_ENCRYPTION_KEY not set. API key encryption will fail until this is configured."
         )
-
-    # Run database migrations
 
     try:
         migration_manager = AsyncMigrationManager()
@@ -89,30 +121,21 @@ async def lifespan(app: FastAPI):
                 f"Migrations completed successfully. Database is now at version {new_version}"
             )
         else:
-            logger.info(
-                "Database is already at the latest version. No migrations needed."
-            )
+            logger.info("Database is already at the latest version. No migrations needed.")
     except Exception as e:
         logger.error(f"CRITICAL: Database migration failed: {str(e)}")
         logger.exception(e)
-        # Fail fast - don't start the API with an outdated database schema
         raise RuntimeError(f"Failed to run database migrations: {str(e)}") from e
 
-    # Run podcast profile data migration (legacy strings -> Model registry)
     try:
         from open_notebook.podcasts.migration import migrate_podcast_profiles
 
         await migrate_podcast_profiles()
     except Exception as e:
         logger.warning(f"Podcast profile migration encountered errors: {e}")
-        # Non-fatal: profiles can be migrated manually via UI
 
     logger.success("API initialization completed successfully")
-
-    # Yield control to the application
     yield
-
-    # Shutdown: cleanup if needed
     logger.info("API shutdown complete")
 
 
@@ -120,143 +143,74 @@ app = FastAPI(
     title="Open Notebook API",
     description="API for Open Notebook - Research Assistant",
     lifespan=lifespan,
+    docs_url="/docs" if PUBLIC_DOCS_ENABLED else None,
+    redoc_url="/redoc" if PUBLIC_DOCS_ENABLED else None,
+    openapi_url="/openapi.json" if PUBLIC_DOCS_ENABLED else None,
 )
 
-# Add password authentication middleware first
-# Exclude /api/auth/status and /api/config from authentication
 app.add_middleware(
     PasswordAuthMiddleware,
-    excluded_paths=[
-        "/",
-        "/health",
-        "/docs",
-        "/openapi.json",
-        "/redoc",
-        "/api/auth/status",
-        "/api/config",
-    ],
+    excluded_paths=_build_auth_excluded_paths(),
 )
 
-# Add CORS middleware last (so it processes first)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific origins
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],
 )
 
 
-# Custom exception handler to ensure CORS headers are included in error responses
-# This helps when errors occur before the CORS middleware can process them
 @app.exception_handler(StarletteHTTPException)
 async def custom_http_exception_handler(request: Request, exc: StarletteHTTPException):
-    """
-    Custom exception handler that ensures CORS headers are included in error responses.
-    This is particularly important for 413 (Payload Too Large) errors during file uploads.
-
-    Note: If a reverse proxy (nginx, traefik) returns 413 before the request reaches
-    FastAPI, this handler won't be called. In that case, configure your reverse proxy
-    to add CORS headers to error responses.
-    """
-    # Get the origin from the request
-    origin = request.headers.get("origin", "*")
-
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail},
-        headers={
-            **(exc.headers or {}), "Access-Control-Allow-Origin": origin,
-            "Access-Control-Allow-Credentials": "true",
-            "Access-Control-Allow-Methods": "*",
-            "Access-Control-Allow-Headers": "*",
-        },
+        headers={**(exc.headers or {}), **_cors_headers(request)},
     )
-
-
-def _cors_headers(request: Request) -> dict[str, str]:
-    origin = request.headers.get("origin", "*")
-    return {
-        "Access-Control-Allow-Origin": origin,
-        "Access-Control-Allow-Credentials": "true",
-        "Access-Control-Allow-Methods": "*",
-        "Access-Control-Allow-Headers": "*",
-    }
 
 
 @app.exception_handler(NotFoundError)
 async def not_found_error_handler(request: Request, exc: NotFoundError):
-    return JSONResponse(
-        status_code=404,
-        content={"detail": str(exc)},
-        headers=_cors_headers(request),
-    )
+    return JSONResponse(status_code=404, content={"detail": str(exc)}, headers=_cors_headers(request))
 
 
 @app.exception_handler(InvalidInputError)
 async def invalid_input_error_handler(request: Request, exc: InvalidInputError):
-    return JSONResponse(
-        status_code=400,
-        content={"detail": str(exc)},
-        headers=_cors_headers(request),
-    )
+    return JSONResponse(status_code=400, content={"detail": str(exc)}, headers=_cors_headers(request))
 
 
 @app.exception_handler(AuthenticationError)
 async def authentication_error_handler(request: Request, exc: AuthenticationError):
-    return JSONResponse(
-        status_code=401,
-        content={"detail": str(exc)},
-        headers=_cors_headers(request),
-    )
+    return JSONResponse(status_code=401, content={"detail": str(exc)}, headers=_cors_headers(request))
 
 
 @app.exception_handler(RateLimitError)
 async def rate_limit_error_handler(request: Request, exc: RateLimitError):
-    return JSONResponse(
-        status_code=429,
-        content={"detail": str(exc)},
-        headers=_cors_headers(request),
-    )
+    return JSONResponse(status_code=429, content={"detail": str(exc)}, headers=_cors_headers(request))
 
 
 @app.exception_handler(ConfigurationError)
 async def configuration_error_handler(request: Request, exc: ConfigurationError):
-    return JSONResponse(
-        status_code=422,
-        content={"detail": str(exc)},
-        headers=_cors_headers(request),
-    )
+    return JSONResponse(status_code=422, content={"detail": str(exc)}, headers=_cors_headers(request))
 
 
 @app.exception_handler(NetworkError)
 async def network_error_handler(request: Request, exc: NetworkError):
-    return JSONResponse(
-        status_code=502,
-        content={"detail": str(exc)},
-        headers=_cors_headers(request),
-    )
+    return JSONResponse(status_code=502, content={"detail": str(exc)}, headers=_cors_headers(request))
 
 
 @app.exception_handler(ExternalServiceError)
 async def external_service_error_handler(request: Request, exc: ExternalServiceError):
-    return JSONResponse(
-        status_code=502,
-        content={"detail": str(exc)},
-        headers=_cors_headers(request),
-    )
+    return JSONResponse(status_code=502, content={"detail": str(exc)}, headers=_cors_headers(request))
 
 
 @app.exception_handler(OpenNotebookError)
 async def open_notebook_error_handler(request: Request, exc: OpenNotebookError):
-    return JSONResponse(
-        status_code=500,
-        content={"detail": str(exc)},
-        headers=_cors_headers(request),
-    )
+    return JSONResponse(status_code=500, content={"detail": str(exc)}, headers=_cors_headers(request))
 
 
-# Include routers
 app.include_router(auth.router, prefix="/api", tags=["auth"])
 app.include_router(config.router, prefix="/api", tags=["config"])
 app.include_router(notebooks.router, prefix="/api", tags=["notebooks"])
@@ -265,9 +219,7 @@ app.include_router(models.router, prefix="/api", tags=["models"])
 app.include_router(transformations.router, prefix="/api", tags=["transformations"])
 app.include_router(notes.router, prefix="/api", tags=["notes"])
 app.include_router(embedding.router, prefix="/api", tags=["embedding"])
-app.include_router(
-    embedding_rebuild.router, prefix="/api/embeddings", tags=["embeddings"]
-)
+app.include_router(embedding_rebuild.router, prefix="/api/embeddings", tags=["embeddings"])
 app.include_router(settings.router, prefix="/api", tags=["settings"])
 app.include_router(context.router, prefix="/api", tags=["context"])
 app.include_router(sources.router, prefix="/api", tags=["sources"])
