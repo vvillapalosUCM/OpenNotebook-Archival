@@ -1,0 +1,46 @@
+services:
+  surrealdb:
+    image: surrealdb/surrealdb:v2
+    command: start --log info --user root --pass root rocksdb:/mydata/mydatabase.db
+    user: root
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./surreal_data:/mydata
+    restart: always
+
+  open_notebook:
+    image: lfnovo/open_notebook:v1-latest
+    ports:
+      - "127.0.0.1:8502:8502"
+      - "127.0.0.1:5055:5055"
+    environment:
+      - OPEN_NOTEBOOK_ENCRYPTION_KEY=CHANGE_ME
+      - OPEN_NOTEBOOK_PASSWORD=CHANGE_ME_STRONG_PASSWORD
+      - OPEN_NOTEBOOK_ALLOWED_ORIGINS=http://localhost:8502,http://127.0.0.1:8502
+      - OPEN_NOTEBOOK_PUBLIC_DOCS=false
+      - OPEN_NOTEBOOK_ENABLE_UPDATE_CHECK=false
+      - OPEN_NOTEBOOK_TRUST_PROXY_HEADERS=false
+      - OPEN_NOTEBOOK_AUTH_MAX_ATTEMPTS=10
+      - OPEN_NOTEBOOK_AUTH_WINDOW_SECONDS=300
+      - OPEN_NOTEBOOK_AUTH_BLOCK_SECONDS=600
+      - OPEN_NOTEBOOK_AUTH_FAILURE_DELAY_MS=400
+      - OPEN_NOTEBOOK_MAX_UPLOAD_BYTES=52428800
+      - OPEN_NOTEBOOK_ALLOW_PRIVATE_SOURCE_URLS=false
+      - SURREAL_URL=ws://surrealdb:8000/rpc
+      - SURREAL_USER=root
+      - SURREAL_PASSWORD=root
+      - SURREAL_NAMESPACE=open_notebook
+      - SURREAL_DATABASE=open_notebook
+      - OLLAMA_API_BASE=http://host.docker.internal:11434
+      - OPENAI_COMPATIBLE_BASE_URL=
+      - OPENAI_COMPATIBLE_API_KEY=
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+    volumes:
+      - ./notebook_data:/app/data
+    depends_on:
+      - surrealdb
+    restart: always
