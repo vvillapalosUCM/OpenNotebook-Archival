@@ -12,8 +12,11 @@ from api.podcast_service import (
     PodcastGenerationResponse,
     PodcastService,
 )
+from open_notebook.config import DATA_FOLDER
 
 router = APIRouter()
+
+PODCAST_EPISODES_DIR = (Path(DATA_FOLDER) / "podcasts" / "episodes").resolve()
 
 
 class PodcastEpisodeResponse(BaseModel):
@@ -34,8 +37,19 @@ class PodcastEpisodeResponse(BaseModel):
 def _resolve_audio_path(audio_file: str) -> Path:
     if audio_file.startswith("file://"):
         parsed = urlparse(audio_file)
-        return Path(unquote(parsed.path))
-    return Path(audio_file)
+        raw_path = unquote(parsed.path)
+    else:
+        raw_path = audio_file
+
+    resolved_path = Path(raw_path).expanduser().resolve()
+
+    if PODCAST_EPISODES_DIR not in resolved_path.parents:
+        raise HTTPException(
+            status_code=403,
+            detail="Access to audio file denied: path outside podcast directory",
+        )
+
+    return resolved_path
 
 
 @router.post("/podcasts/generate", response_model=PodcastGenerationResponse)
@@ -111,9 +125,15 @@ async def list_podcast_episodes():
 
             audio_url = None
             if episode.audio_file:
-                audio_path = _resolve_audio_path(episode.audio_file)
-                if audio_path.exists():
-                    audio_url = f"/api/podcasts/episodes/{episode.id}/audio"
+                try:
+                    audio_path = _resolve_audio_path(episode.audio_file)
+                    if audio_path.exists():
+                        audio_url = f"/api/podcasts/episodes/{episode.id}/audio"
+                except HTTPException:
+                    logger.warning(
+                        "Blocked unsafe audio path while listing episode {}",
+                        episode.id,
+                    )
 
             response_episodes.append(
                 PodcastEpisodeResponse(
@@ -163,9 +183,15 @@ async def get_podcast_episode(episode_id: str):
 
         audio_url = None
         if episode.audio_file:
-            audio_path = _resolve_audio_path(episode.audio_file)
-            if audio_path.exists():
-                audio_url = f"/api/podcasts/episodes/{episode.id}/audio"
+            try:
+                audio_path = _resolve_audio_path(episode.audio_file)
+                if audio_path.exists():
+                    audio_url = f"/api/podcasts/episodes/{episode.id}/audio"
+            except HTTPException:
+                logger.warning(
+                    "Blocked unsafe audio path while loading episode {}",
+                    episode.id,
+                )
 
         return PodcastEpisodeResponse(
             id=str(episode.id),
@@ -292,6 +318,8 @@ async def delete_podcast_episode(episode_id: str):
         logger.info(f"Deleted podcast episode: {episode_id}")
         return {"message": "Episode deleted successfully", "episode_id": episode_id}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error deleting podcast episode: {str(e)}")
         raise HTTPException(

@@ -1,5 +1,28 @@
 . "$PSScriptRoot\Common.ps1"
 
+function ConvertFrom-SecureToPlainText([System.Security.SecureString]$SecureValue) {
+    $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($SecureValue)
+    try {
+        return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
+    } finally {
+        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+    }
+}
+
+function Read-SecretValue([string]$Prompt) {
+    $secure = Read-Host $Prompt -AsSecureString
+    return ConvertFrom-SecureToPlainText $secure
+}
+
+function Test-PasswordPolicy([string]$Password) {
+    if ([string]::IsNullOrWhiteSpace($Password)) { return $false }
+    if ($Password.Length -lt 12) { return $false }
+    if ($Password -notmatch '[A-Z]') { return $false }
+    if ($Password -notmatch '[a-z]') { return $false }
+    if ($Password -notmatch '\d') { return $false }
+    return $true
+}
+
 try {
     Write-Section "Comprobando requisitos"
     Assert-RequiredFile $script:ComposePath "El archivo docker-compose de Windows"
@@ -10,16 +33,27 @@ try {
     Write-Section "Preparando configuración"
     $settings = Ensure-EnvFile
 
+    Write-Warn "La contraseña de acceso se guardará en deployment\windows\runtime\settings.env para que Docker Compose pueda arrancar la aplicación."
+
     if ([string]::IsNullOrWhiteSpace([string]$settings["OPEN_NOTEBOOK_PASSWORD"])) {
         do {
-            $pwd = Read-Host "Introduzca la contraseña inicial de la herramienta"
-            if ($pwd.Length -lt 10) {
-                Write-Warn "La contraseña debe tener al menos 10 caracteres."
+            $pwd = Read-SecretValue "Introduzca la contraseña inicial de la herramienta"
+            if (-not (Test-PasswordPolicy $pwd)) {
+                Write-Warn "La contraseña debe tener al menos 12 caracteres, con mayúsculas, minúsculas y dígitos."
             }
-        } while ($pwd.Length -lt 10)
+        } while (-not (Test-PasswordPolicy $pwd))
         $settings["OPEN_NOTEBOOK_PASSWORD"] = $pwd
     } else {
-        $settings["OPEN_NOTEBOOK_PASSWORD"] = Prompt-Value "Contraseña de acceso" $settings["OPEN_NOTEBOOK_PASSWORD"]
+        $changePassword = Read-Host "Ya existe una contraseña configurada. ¿Desea cambiarla? (s/N)"
+        if ($changePassword.Trim().ToLower() -in @("s", "si", "sí", "y", "yes")) {
+            do {
+                $pwd = Read-SecretValue "Introduzca la nueva contraseña de la herramienta"
+                if (-not (Test-PasswordPolicy $pwd)) {
+                    Write-Warn "La contraseña debe tener al menos 12 caracteres, con mayúsculas, minúsculas y dígitos."
+                }
+            } while (-not (Test-PasswordPolicy $pwd))
+            $settings["OPEN_NOTEBOOK_PASSWORD"] = $pwd
+        }
     }
 
     $hostOllama = Prompt-Value "URL local de Ollama (vista desde este ordenador)" $settings["HOST_OLLAMA_URL"]

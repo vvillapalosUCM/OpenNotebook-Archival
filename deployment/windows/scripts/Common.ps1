@@ -125,6 +125,9 @@ function Ensure-EnvFile {
     Set-IfMissing $settings "FRONTEND_PORT" "8502"
     Set-IfMissing $settings "API_PORT" "5055"
     Set-IfMissing $settings "SURREAL_PORT" "8000"
+    Set-IfMissing $settings "SURREAL_ROOT_USER" "open_notebook"
+    Set-IfMissing $settings "SURREAL_NAMESPACE" "open_notebook"
+    Set-IfMissing $settings "SURREAL_DATABASE" "open_notebook"
     Set-IfMissing $settings "OPEN_NOTEBOOK_ALLOWED_ORIGINS" "http://localhost:8502,http://127.0.0.1:8502"
     Set-IfMissing $settings "OPEN_NOTEBOOK_PUBLIC_DOCS" "false"
     Set-IfMissing $settings "OPEN_NOTEBOOK_ENABLE_UPDATE_CHECK" "false"
@@ -142,6 +145,10 @@ function Ensure-EnvFile {
 
     if ([string]::IsNullOrWhiteSpace([string]$settings["OPEN_NOTEBOOK_ENCRYPTION_KEY"])) {
         $settings["OPEN_NOTEBOOK_ENCRYPTION_KEY"] = New-RandomSecret
+    }
+
+    if ([string]::IsNullOrWhiteSpace([string]$settings["SURREAL_ROOT_PASSWORD"])) {
+        $settings["SURREAL_ROOT_PASSWORD"] = New-RandomSecret
     }
 
     Save-EnvFile $settings $script:EnvPath

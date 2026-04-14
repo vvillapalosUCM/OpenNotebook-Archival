@@ -30,6 +30,14 @@ ENABLE_UPDATE_CHECK = os.environ.get("OPEN_NOTEBOOK_ENABLE_UPDATE_CHECK", "false
     "yes",
     "on",
 }
+VERSION_REPOSITORY_URL = os.environ.get(
+    "OPEN_NOTEBOOK_VERSION_REPOSITORY_URL",
+    "https://github.com/vvillapalosUCM/OpenNotebook-Archival",
+).strip()
+VERSION_REPOSITORY_BRANCH = os.environ.get(
+    "OPEN_NOTEBOOK_VERSION_REPOSITORY_BRANCH",
+    "main",
+).strip() or "main"
 
 
 def get_version() -> str:
@@ -60,7 +68,8 @@ async def get_latest_version_cached(current_version: str) -> tuple[Optional[str]
     try:
         logger.info("Checking for latest version from GitHub...")
         latest_version = await get_version_from_github_async(
-            "https://github.com/lfnovo/open-notebook", "main"
+            VERSION_REPOSITORY_URL,
+            VERSION_REPOSITORY_BRANCH,
         )
         logger.info(
             f"Latest version from GitHub: {latest_version}, Current version: {current_version}"

@@ -5,14 +5,12 @@ FROM python:3.12-slim-bookworm AS builder
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # Install system dependencies required for building certain Python packages
-# Add Node.js 20.x LTS for building frontend
-# NOTE: gcc/g++/make removed - uv should download pre-built wheels. Add back if build fails.
-# NOTE: gcc/g++/make required for some python dependencies
+# Use Debian packages for Node.js/NPM instead of curl|bash installer scripts.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
     build-essential \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs \
+    curl \
+    nodejs \
+    npm \
     && rm -rf /var/lib/apt/lists/*
 
 # Set build optimization environment variables
@@ -59,13 +57,10 @@ WORKDIR /app
 FROM python:3.12-slim-bookworm AS runtime
 
 # Install only runtime system dependencies (no build tools)
-# Add Node.js 20.x LTS for running frontend
 RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     ffmpeg \
+    nodejs \
     supervisor \
-    curl \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv using the official method
@@ -101,8 +96,6 @@ COPY --from=builder /app/frontend/start-server.js /app/frontend/start-server.js
 # Expose ports for Frontend and API
 EXPOSE 8502 5055
 
-RUN mkdir -p /app/data
-
 # Copy and normalize the wait-for-api script
 COPY scripts/wait-for-api.sh /app/scripts/wait-for-api.sh
 RUN sed -i 's/\r$//' /app/scripts/wait-for-api.sh && chmod +x /app/scripts/wait-for-api.sh
@@ -110,8 +103,11 @@ RUN sed -i 's/\r$//' /app/scripts/wait-for-api.sh && chmod +x /app/scripts/wait-
 # Copy supervisord configuration
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-# Create log directories
-RUN mkdir -p /var/log/supervisor
+# Create runtime directories and a non-root user
+RUN mkdir -p /app/data /var/log/supervisor /tmp \
+    && groupadd --system notebook \
+    && useradd --system --gid notebook --home-dir /app --shell /usr/sbin/nologin notebook \
+    && chown -R notebook:notebook /app/data /var/log/supervisor /tmp
 
 # Runtime API URL Configuration
 # The API_URL environment variable can be set at container runtime to configure
@@ -122,5 +118,7 @@ RUN mkdir -p /var/log/supervisor
 # Set API_URL when using reverse proxies or custom domains.
 #
 # Example: docker run -e API_URL=https://your-domain.com/api ...
+
+USER notebook
 
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

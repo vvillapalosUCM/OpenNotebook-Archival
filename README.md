@@ -1,361 +1,177 @@
-<a id="readme-top"></a>
+# OpenNotebook-Archival
 
-<!-- [![Contributors][contributors-shield]][contributors-url] -->
-[![Forks][forks-shield]][forks-url]
-[![Stargazers][stars-shield]][stars-url]
-[![Issues][issues-shield]][issues-url]
-[![MIT License][license-shield]][license-url]
-<!-- [![LinkedIn][linkedin-shield]][linkedin-url] -->
+OpenNotebook-Archival es un fork orientado a archivos, bibliotecas y entornos GLAM que prioriza despliegue local, privacidad, trazabilidad y adaptación institucional. Su enfoque no es “usar más proveedores”, sino ofrecer una base controlada para trabajar con modelos locales —especialmente Ollama— y con documentación sensible.
 
+Este repositorio parte del trabajo original de `lfnovo/open-notebook`, pero aquí se reorienta a un escenario archivístico y de investigación documental: instalación local, endurecimiento de seguridad, configuración comprensible y futura especialización funcional para descripción, análisis y transformación documental.
 
-<!-- PROJECT LOGO -->
-<br />
-<div align="center">
-  <a href="https://github.com/lfnovo/open-notebook">
-    <img src="docs/assets/hero.svg" alt="Logo">
-  </a>
+## Estado actual del fork
 
-  <h3 align="center">Open Notebook</h3>
+La base funcional existe, pero este fork sigue en fase de saneamiento estructural. Antes de ampliar funciones archivísticas conviene dejar cerradas estas capas:
 
-  <p align="center">
-    An open source, privacy-focused alternative to Google's Notebook LM!
-    <br /><strong>Join our <a href="https://discord.gg/37XJPXfz2w">Discord server</a> for help, to share workflow ideas, and suggest features!</strong>
-    <br />
-    <a href="https://www.open-notebook.ai"><strong>Checkout our website »</strong></a>
-    <br />
-    <br />
-    <a href="docs/0-START-HERE/index.md">📚 Get Started</a>
-    ·
-    <a href="docs/3-USER-GUIDE/index.md">📖 User Guide</a>
-    ·
-    <a href="docs/2-CORE-CONCEPTS/index.md">✨ Features</a>
-    ·
-    <a href="docs/1-INSTALLATION/index.md">🚀 Deploy</a>
-  </p>
-</div>
+- seguridad del backend y del despliegue;
+- instalación reproducible en Windows;
+- documentación alineada con el fork;
+- defaults seguros para uso local e institucional.
 
-<p align="center">
-<a href="https://trendshift.io/repositories/14536" target="_blank"><img src="https://trendshift.io/api/badge/repositories/14536" alt="lfnovo%2Fopen-notebook | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-</p>
+## Qué se ha corregido en esta tanda
 
-<div align="center">
-  <!-- Keep these links. Translations will automatically update with the README. -->
-  <a href="https://zdoc.app/de/lfnovo/open-notebook">Deutsch</a> | 
-  <a href="https://zdoc.app/es/lfnovo/open-notebook">Español</a> | 
-  <a href="https://zdoc.app/fr/lfnovo/open-notebook">français</a> | 
-  <a href="https://zdoc.app/ja/lfnovo/open-notebook">日本語</a> | 
-  <a href="https://zdoc.app/ko/lfnovo/open-notebook">한국어</a> | 
-  <a href="https://zdoc.app/pt/lfnovo/open-notebook">Português</a> | 
-  <a href="https://zdoc.app/ru/lfnovo/open-notebook">Русский</a> | 
-  <a href="https://zdoc.app/zh/lfnovo/open-notebook">中文</a>
-</div>
+Esta versión de archivos deja preparada una línea de trabajo más segura y coherente:
 
-## A private, multi-model, 100% local, full-featured alternative to Notebook LM
+- CORS restringido a orígenes explícitos.
+- `/api/config` deja de ser público.
+- documentación Swagger/ReDoc controlada por variable de entorno.
+- cabeceras HTTP de seguridad en backend y frontend.
+- almacenamiento de autenticación en `sessionStorage` en vez de `localStorage`.
+- validación de rutas de audio de podcasts para evitar lecturas fuera del directorio previsto.
+- `Dockerfile` preparado para ejecutar como usuario no privilegiado.
+- `docker-compose.yml` principal orientado al build local del fork, no a la imagen upstream.
+- creación del compose específico para Windows que faltaba en el repositorio.
+- instalador de Windows con contraseña oculta y política mínima más exigente.
+- actualización de comprobación de versión apuntando al fork, no al upstream.
 
-![New Notebook](docs/assets/asset_list.png)
+## Identidad del proyecto
 
-In a world dominated by Artificial Intelligence, having the ability to think 🧠 and acquire new knowledge 💡, is a skill that should not be a privilege for a few, nor restricted to a single provider.
+Este fork está pensado para:
 
-**Open Notebook empowers you to:**
-- 🔒 **Control your data** - Keep your research private and secure
-- 🤖 **Choose your AI models** - Support for 18+ providers including OpenAI, Anthropic, Ollama, LM Studio, and more
-- 📚 **Organize multi-modal content** - PDFs, videos, audio, web pages, and more
-- 🎙️ **Generate professional podcasts** - Advanced multi-speaker podcast generation
-- 🔍 **Search intelligently** - Full-text and vector search across all your content
-- 💬 **Chat with context** - AI conversations powered by your research
-- 🌐 **Multi-language UI** - English, Portuguese, Chinese (Simplified & Traditional), Japanese, Russian, and Bengali support
+- profesionales de archivos, bibliotecas, documentación y gestión del conocimiento;
+- uso local o semilocal dentro de red controlada;
+- integración futura con Ollama y endpoints OpenAI-compatible locales;
+- extensiones archivísticas como transformaciones ISAD(G), extracción de metadatos y exportación interoperable.
 
-Learn more about our project at [https://www.open-notebook.ai](https://www.open-notebook.ai)
+No está planteado como producto SaaS ni como entorno multiusuario abierto a Internet sin una capa adicional de reverse proxy, TLS y endurecimiento de sistema.
 
----
+## Instalación rápida en Linux/macOS
 
-## 🆚 Open Notebook vs Google Notebook LM
+1. Clona el repositorio.
+2. Copia `.env.example` a `.env`.
+3. Sustituye los secretos `CHANGE_ME`.
+4. Arranca el entorno.
 
-| Feature | Open Notebook | Google Notebook LM | Advantage |
-|---------|---------------|--------------------|-----------|
-| **Privacy & Control** | Self-hosted, your data | Google cloud only | Complete data sovereignty |
-| **AI Provider Choice** | 18+ providers (OpenAI, Anthropic, Ollama, LM Studio, etc.) | Google models only | Flexibility and cost optimization |
-| **Podcast Speakers** | 1-4 speakers with custom profiles | 2 speakers only | Extreme flexibility |
-| **Content Transformations** | Custom and built-in | Limited options | Unlimited processing power |
-| **API Access** | Full REST API | No API | Complete automation |
-| **Deployment** | Docker, cloud, or local | Google hosted only | Deploy anywhere |
-| **Citations** | Basic references (will improve) | Comprehensive with sources | Research integrity |
-| **Customization** | Open source, fully customizable | Closed system | Unlimited extensibility |
-| **Cost** | Pay only for AI usage | Free tier + Monthly subscription | Transparent and controllable |
-
-**Why Choose Open Notebook?**
-- 🔒 **Privacy First**: Your sensitive research stays completely private
-- 💰 **Cost Control**: Choose cheaper AI providers or run locally with Ollama
-- 🎙️ **Better Podcasts**: Full script control and multi-speaker flexibility vs limited 2-speaker deep-dive format
-- 🔧 **Unlimited Customization**: Modify, extend, and integrate as needed
-- 🌐 **No Vendor Lock-in**: Switch providers, deploy anywhere, own your data
-
-### Built With
-
-[![Python][Python]][Python-url] [![Next.js][Next.js]][Next-url] [![React][React]][React-url] [![SurrealDB][SurrealDB]][SurrealDB-url] [![LangChain][LangChain]][LangChain-url]
-
-## 🚀 Quick Start (2 Minutes)
-
-### Prerequisites
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed
-- That's it! (API keys configured later in the UI)
-
-### Step 1: Get docker-compose.yml
-
-**Option A:** Download directly
 ```bash
-curl -o docker-compose.yml https://raw.githubusercontent.com/lfnovo/open-notebook/main/docker-compose.yml
+cp .env.example .env
+docker compose up -d --build
 ```
 
-**Option B:** Create the file manually
-Copy this into a new file called `docker-compose.yml`:
+La aplicación quedará accesible en:
 
-```yaml
-services:
-  surrealdb:
-    image: surrealdb/surrealdb:v2
-    command: start --log info --user root --pass root rocksdb:/mydata/mydatabase.db
-    user: root
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./surreal_data:/mydata
-    restart: always
+- frontend: `http://localhost:8502`
+- API: `http://localhost:5055`
 
-  open_notebook:
-    image: lfnovo/open_notebook:v1-latest
-    ports:
-      - "8502:8502"
-      - "5055:5055"
-    environment:
-      - OPEN_NOTEBOOK_ENCRYPTION_KEY=change-me-to-a-secret-string
-      - SURREAL_URL=ws://surrealdb:8000/rpc
-      - SURREAL_USER=root
-      - SURREAL_PASSWORD=root
-      - SURREAL_NAMESPACE=open_notebook
-      - SURREAL_DATABASE=open_notebook
-    volumes:
-      - ./notebook_data:/app/data
-    depends_on:
-      - surrealdb
-    restart: always
+Por defecto, el `docker-compose.yml` principal publica solo frontend y API en `127.0.0.1`. SurrealDB no se publica externamente.
+
+## Instalación en Windows
+
+El repositorio incluye un flujo específico para Windows en `deployment/windows/`.
+
+Pasos recomendados:
+
+1. Asegúrate de tener Docker Desktop iniciado.
+2. Abre PowerShell en la carpeta del repositorio.
+3. Ejecuta:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\deployment\windows\scripts\Install.ps1
 ```
 
-### Step 2: Set Your Encryption Key
-Edit `docker-compose.yml` and change this line:
-```yaml
-- OPEN_NOTEBOOK_ENCRYPTION_KEY=change-me-to-a-secret-string
-```
-to any secret value (e.g., `my-super-secret-key-123`)
+El instalador:
 
-### Step 3: Start Services
+- genera secretos internos si faltan;
+- solicita la contraseña de acceso en modo oculto;
+- construye la imagen local del fork;
+- guarda la configuración en `deployment/windows/runtime/settings.env`.
+
+## Variables de entorno relevantes
+
+### Seguridad y autenticación
+
+- `OPEN_NOTEBOOK_PASSWORD`: contraseña de acceso a la aplicación.
+- `OPEN_NOTEBOOK_ENCRYPTION_KEY`: clave de cifrado para credenciales almacenadas.
+- `OPEN_NOTEBOOK_ALLOWED_ORIGINS`: lista CSV de orígenes permitidos para CORS.
+- `OPEN_NOTEBOOK_PUBLIC_DOCS`: `true` o `false` para exponer Swagger/ReDoc.
+- `OPEN_NOTEBOOK_ENABLE_UPDATE_CHECK`: activa o desactiva la comprobación de actualizaciones.
+- `OPEN_NOTEBOOK_ALLOW_PRIVATE_SOURCE_URLS`: controla si se permiten URLs privadas en fuentes.
+
+### Base de datos
+
+- `SURREAL_ROOT_USER`
+- `SURREAL_ROOT_PASSWORD`
+- `SURREAL_NAMESPACE`
+- `SURREAL_DATABASE`
+
+### Modelos locales
+
+- `OLLAMA_API_BASE`: endpoint de Ollama visto desde el contenedor.
+- `OPENAI_COMPATIBLE_BASE_URL`: endpoint compatible con OpenAI en local o red privada.
+- `OPENAI_COMPATIBLE_API_KEY`: credencial opcional para dicho endpoint.
+
+## Consideraciones de seguridad
+
+Este fork se orienta a un despliegue local endurecido, pero eso no convierte automáticamente la aplicación en apta para Internet abierta. Si vas a exponerla fuera de localhost, debes añadir como mínimo:
+
+- TLS terminado correctamente;
+- reverse proxy controlado;
+- política de logs y copias de seguridad;
+- revisión de permisos y puertos;
+- endurecimiento del host.
+
+Recomendaciones inmediatas:
+
+- no reutilices contraseñas;
+- usa secretos largos y aleatorios;
+- no actives `OPEN_NOTEBOOK_PUBLIC_DOCS` salvo necesidad real;
+- mantén `OPEN_NOTEBOOK_ALLOW_PRIVATE_SOURCE_URLS=false` mientras no haya un caso justificado;
+- si cambias el puerto del frontend, actualiza también `OPEN_NOTEBOOK_ALLOWED_ORIGINS`.
+
+## Orientación funcional del fork
+
+La dirección natural de OpenNotebook-Archival no es competir por cantidad de proveedores ni por marketing de “productividad genérica”. Su valor diferencial está en:
+
+- adaptación al trabajo archivístico y documental;
+- apoyo a análisis local de fuentes;
+- transformaciones especializadas;
+- trazabilidad y control institucional;
+- integración futura con herramientas como ArchivesSpace, AtoM o flujos exportables.
+
+Líneas funcionales previstas:
+
+- prompts archivísticos especializados;
+- transformaciones predefinidas para ISAD(G) y tareas de análisis documental;
+- mayor simplificación de la UI para escenarios solo-locales;
+- internacionalización al español;
+- exportaciones orientadas a entornos GLAM.
+
+## Diferencias respecto al upstream
+
+Este fork no debe seguir presentándose como una simple copia de Open Notebook. A nivel documental y operativo se recomienda mantener:
+
+- identidad propia del fork;
+- documentación propia de instalación;
+- política de versiones propia;
+- referencias al upstream solo como atribución técnica, no como centro del proyecto.
+
+## Desarrollo
+
+Para trabajar sobre el código del fork:
+
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
-Wait 15-20 seconds, then open: **http://localhost:8502**
+El compose principal ya está planteado para construir la imagen desde este mismo repositorio. Eso evita el problema anterior de estar modificando el código del fork mientras el despliegue seguía ejecutando la imagen upstream.
 
-### Step 4: Configure AI Provider
-1. Go to **Settings** → **API Keys**
-2. Click **Add Credential**
-3. Choose your provider (OpenAI, Anthropic, Google, etc.)
-4. Paste your API key and click **Save**
-5. Click **Test Connection** → **Discover Models** → **Register Models**
+## Estructura útil del repositorio
 
-Done! You're ready to create your first notebook.
+- `api/`: backend FastAPI
+- `frontend/`: interfaz Next.js
+- `commands/`: comandos y trabajos de procesamiento
+- `open_notebook/`: dominio y lógica principal
+- `configs/archival/`: compose alternativo local-only
+- `deployment/windows/`: instalación guiada para Windows
 
-> **Need an API key?** Get one from:
-> [OpenAI](https://platform.openai.com/api-keys) · [Anthropic](https://console.anthropic.com/) · [Google](https://aistudio.google.com/) · [Groq](https://console.groq.com/) (free tier)
+## Créditos
 
-> **Want free local AI?** See [examples/docker-compose-ollama.yml](examples/) for Ollama setup
+Proyecto derivado del trabajo original de `lfnovo/open-notebook`, adaptado aquí como fork orientado a necesidades archivísticas y documentales.
 
----
+## Licencia
 
-### 📚 More Installation Options
-
-- **[With Ollama (Free Local AI)](examples/docker-compose-ollama.yml)** - Run models locally without API costs
-- **[From Source (Developers)](docs/1-INSTALLATION/from-source.md)** - For development and contributions
-- **[Complete Installation Guide](docs/1-INSTALLATION/index.md)** - All deployment scenarios
-
----
-
-### 📖 Need Help?
-
-- **🤖 AI Installation Assistant**: [CustomGPT to help you install](https://chatgpt.com/g/g-68776e2765b48191bd1bae3f30212631-open-notebook-installation-assistant)
-- **🆘 Troubleshooting**: [5-minute troubleshooting guide](docs/6-TROUBLESHOOTING/quick-fixes.md)
-- **💬 Community Support**: [Discord Server](https://discord.gg/37XJPXfz2w)
-- **🐛 Report Issues**: [GitHub Issues](https://github.com/lfnovo/open-notebook/issues)
-
----
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=lfnovo/open-notebook&type=date&legend=top-left)](https://www.star-history.com/#lfnovo/open-notebook&type=date&legend=top-left)
-
-
-## Provider Support Matrix
-
-Thanks to the [Esperanto](https://github.com/lfnovo/esperanto) library, we support this providers out of the box!
-
-| Provider     | LLM Support | Embedding Support | Speech-to-Text | Text-to-Speech |
-|--------------|-------------|------------------|----------------|----------------|
-| OpenAI       | ✅          | ✅               | ✅             | ✅             |
-| Anthropic    | ✅          | ❌               | ❌             | ❌             |
-| Groq         | ✅          | ❌               | ✅             | ❌             |
-| Google (GenAI) | ✅          | ✅               | ❌             | ✅             |
-| Vertex AI    | ✅          | ✅               | ❌             | ✅             |
-| Ollama       | ✅          | ✅               | ❌             | ❌             |
-| Perplexity   | ✅          | ❌               | ❌             | ❌             |
-| ElevenLabs   | ❌          | ❌               | ✅             | ✅             |
-| Azure OpenAI | ✅          | ✅               | ❌             | ❌             |
-| Mistral      | ✅          | ✅               | ❌             | ❌             |
-| DeepSeek     | ✅          | ❌               | ❌             | ❌             |
-| Voyage       | ❌          | ✅               | ❌             | ❌             |
-| xAI          | ✅          | ❌               | ❌             | ❌             |
-| OpenRouter   | ✅          | ❌               | ❌             | ❌             |
-| DashScope (Qwen) | ✅          | ❌               | ❌             | ❌             |
-| MiniMax      | ✅          | ❌               | ❌             | ❌             |
-| OpenAI Compatible* | ✅          | ❌               | ❌             | ❌             |
-
-*Supports LM Studio and any OpenAI-compatible endpoint
-
-## ✨ Key Features
-
-### Core Capabilities
-- **🔒 Privacy-First**: Your data stays under your control - no cloud dependencies
-- **🎯 Multi-Notebook Organization**: Manage multiple research projects seamlessly
-- **📚 Universal Content Support**: PDFs, videos, audio, web pages, Office docs, and more
-- **🤖 Multi-Model AI Support**: 18+ providers including OpenAI, Anthropic, Ollama, Google, LM Studio, and more
-- **🎙️ Professional Podcast Generation**: Advanced multi-speaker podcasts with Episode Profiles
-- **🔍 Intelligent Search**: Full-text and vector search across all your content
-- **💬 Context-Aware Chat**: AI conversations powered by your research materials
-- **📝 AI-Assisted Notes**: Generate insights or write notes manually
-
-### Advanced Features
-- **⚡ Reasoning Model Support**: Full support for thinking models like DeepSeek-R1 and Qwen3
-- **🔧 Content Transformations**: Powerful customizable actions to summarize and extract insights
-- **🌐 Comprehensive REST API**: Full programmatic access for custom integrations [![API Docs](https://img.shields.io/badge/API-Documentation-blue?style=flat-square)](http://localhost:5055/docs)
-- **🔐 Optional Password Protection**: Secure public deployments with authentication
-- **📊 Fine-Grained Context Control**: Choose exactly what to share with AI models
-- **📎 Citations**: Get answers with proper source citations
-
-
-## Podcast Feature
-
-[![Check out our podcast sample](https://img.youtube.com/vi/D-760MlGwaI/0.jpg)](https://www.youtube.com/watch?v=D-760MlGwaI)
-
-## 📚 Documentation
-
-### Getting Started
-- **[📖 Introduction](docs/0-START-HERE/index.md)** - Learn what Open Notebook offers
-- **[⚡ Quick Start](docs/0-START-HERE/quick-start.md)** - Get up and running in 5 minutes
-- **[🔧 Installation](docs/1-INSTALLATION/index.md)** - Comprehensive setup guide
-- **[🎯 Your First Notebook](docs/0-START-HERE/first-notebook.md)** - Step-by-step tutorial
-
-### User Guide
-- **[📱 Interface Overview](docs/3-USER-GUIDE/interface-overview.md)** - Understanding the layout
-- **[📚 Notebooks](docs/3-USER-GUIDE/notebooks.md)** - Organizing your research
-- **[📄 Sources](docs/3-USER-GUIDE/sources.md)** - Managing content types
-- **[📝 Notes](docs/3-USER-GUIDE/notes.md)** - Creating and managing notes
-- **[💬 Chat](docs/3-USER-GUIDE/chat.md)** - AI conversations
-- **[🔍 Search](docs/3-USER-GUIDE/search.md)** - Finding information
-
-### Advanced Topics
-- **[🎙️ Podcast Generation](docs/2-CORE-CONCEPTS/podcasts.md)** - Create professional podcasts
-- **[🔧 Content Transformations](docs/2-CORE-CONCEPTS/transformations.md)** - Customize content processing
-- **[🤖 AI Models](docs/4-AI-PROVIDERS/index.md)** - AI model configuration
-- **[🔌 MCP Integration](docs/5-CONFIGURATION/mcp-integration.md)** - Connect with Claude Desktop, VS Code and other MCP clients
-- **[🔧 REST API Reference](docs/7-DEVELOPMENT/api-reference.md)** - Complete API documentation
-- **[🔐 Security](docs/5-CONFIGURATION/security.md)** - Password protection and privacy
-- **[🚀 Deployment](docs/1-INSTALLATION/index.md)** - Complete deployment guides for all scenarios
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-## 🗺️ Roadmap
-
-### Upcoming Features
-- **Live Front-End Updates**: Real-time UI updates for smoother experience
-- **Async Processing**: Faster UI through asynchronous content processing
-- **Cross-Notebook Sources**: Reuse research materials across projects
-- **Bookmark Integration**: Connect with your favorite bookmarking apps
-
-### Recently Completed ✅
-- **Next.js Frontend**: Modern React-based frontend with improved performance
-- **Comprehensive REST API**: Full programmatic access to all functionality
-- **Multi-Model Support**: 18+ AI providers including OpenAI, Anthropic, Ollama, LM Studio
-- **Advanced Podcast Generator**: Professional multi-speaker podcasts with Episode Profiles
-- **Content Transformations**: Powerful customizable actions for content processing
-- **Enhanced Citations**: Improved layout and finer control for source citations
-- **Multiple Chat Sessions**: Manage different conversations within notebooks
-
-See the [open issues](https://github.com/lfnovo/open-notebook/issues) for a full list of proposed features and known issues.
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
-## 📖 Need Help?
-- **🤖 AI Installation Assistant**: We have a [CustomGPT built to help you install Open Notebook](https://chatgpt.com/g/g-68776e2765b48191bd1bae3f30212631-open-notebook-installation-assistant) - it will guide you through each step!
-- **New to Open Notebook?** Start with our [Getting Started Guide](docs/0-START-HERE/index.md)
-- **Need installation help?** Check our [Installation Guide](docs/1-INSTALLATION/index.md)
-- **Want to see it in action?** Try our [Quick Start Tutorial](docs/0-START-HERE/quick-start.md)
-
-## 🤝 Community & Contributing
-
-### Join the Community
-- 💬 **[Discord Server](https://discord.gg/37XJPXfz2w)** - Get help, share ideas, and connect with other users
-- 🐛 **[GitHub Issues](https://github.com/lfnovo/open-notebook/issues)** - Report bugs and request features
-- ⭐ **Star this repo** - Show your support and help others discover Open Notebook
-
-### Contributing
-We welcome contributions! We're especially looking for help with:
-- **Frontend Development**: Help improve our modern Next.js/React UI
-- **Testing & Bug Fixes**: Make Open Notebook more robust
-- **Feature Development**: Build the coolest research tool together
-- **Documentation**: Improve guides and tutorials
-
-**Current Tech Stack**: Python, FastAPI, Next.js, React, SurrealDB
-**Future Roadmap**: Real-time updates, enhanced async processing
-
-See our [Contributing Guide](CONTRIBUTING.md) for detailed information on how to get started.
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
-## 📄 License
-
-Open Notebook is MIT licensed. See the [LICENSE](LICENSE) file for details.
-
-
-**Community Support**:
-- 💬 [Discord Server](https://discord.gg/37XJPXfz2w) - Get help, share ideas, and connect with users
-- 🐛 [GitHub Issues](https://github.com/lfnovo/open-notebook/issues) - Report bugs and request features
-- 🌐 [Website](https://www.open-notebook.ai) - Learn more about the project
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
-<!-- MARKDOWN LINKS & IMAGES -->
-<!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
-[contributors-shield]: https://img.shields.io/github/contributors/lfnovo/open-notebook.svg?style=for-the-badge
-[contributors-url]: https://github.com/lfnovo/open-notebook/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/lfnovo/open-notebook.svg?style=for-the-badge
-[forks-url]: https://github.com/lfnovo/open-notebook/network/members
-[stars-shield]: https://img.shields.io/github/stars/lfnovo/open-notebook.svg?style=for-the-badge
-[stars-url]: https://github.com/lfnovo/open-notebook/stargazers
-[issues-shield]: https://img.shields.io/github/issues/lfnovo/open-notebook.svg?style=for-the-badge
-[issues-url]: https://github.com/lfnovo/open-notebook/issues
-[license-shield]: https://img.shields.io/github/license/lfnovo/open-notebook.svg?style=for-the-badge
-[license-url]: https://github.com/lfnovo/open-notebook/blob/master/LICENSE.txt
-[linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
-[linkedin-url]: https://linkedin.com/in/lfnovo
-[product-screenshot]: images/screenshot.png
-[Next.js]: https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=next.js&logoColor=white
-[Next-url]: https://nextjs.org/
-[React]: https://img.shields.io/badge/React-61DAFB?style=for-the-badge&logo=react&logoColor=black
-[React-url]: https://reactjs.org/
-[Python]: https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white
-[Python-url]: https://www.python.org/
-[LangChain]: https://img.shields.io/badge/LangChain-3A3A3A?style=for-the-badge&logo=chainlink&logoColor=white
-[LangChain-url]: https://www.langchain.com/
-[SurrealDB]: https://img.shields.io/badge/SurrealDB-FF5E00?style=for-the-badge&logo=databricks&logoColor=white
-[SurrealDB-url]: https://surrealdb.com/
+Se mantiene la licencia del proyecto original salvo que se indique expresamente otra cosa en el repositorio.

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { createJSONStorage, persist } from 'zustand/middleware'
 import { getApiUrl } from '@/lib/config'
 
 interface AuthState {
@@ -17,6 +17,8 @@ interface AuthState {
   logout: () => void
   checkAuth: () => Promise<boolean>
 }
+
+const authStorage = createJSONStorage(() => sessionStorage)
 
 export const useAuthStore = create<AuthState>()(
   persist(
@@ -62,7 +64,7 @@ export const useAuthStore = create<AuthState>()(
           if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
             set({
               error: 'Unable to connect to server. Please check if the API is running.',
-              authRequired: null  // Don't assume auth is required if we can't connect
+              authRequired: null,  // Don't assume auth is required if we can't connect
             })
           } else {
             // For other errors, default to requiring auth to be safe
@@ -84,17 +86,17 @@ export const useAuthStore = create<AuthState>()(
             method: 'GET',
             headers: {
               'Authorization': `Bearer ${password}`,
-              'Content-Type': 'application/json'
-            }
+              'Content-Type': 'application/json',
+            },
           })
-          
+
           if (response.ok) {
-            set({ 
-              isAuthenticated: true, 
-              token: password, 
+            set({
+              isAuthenticated: true,
+              token: password,
               isLoading: false,
               lastAuthCheck: Date.now(),
-              error: null
+              error: null,
             })
             return true
           } else {
@@ -108,19 +110,19 @@ export const useAuthStore = create<AuthState>()(
             } else {
               errorMessage = `Authentication failed (${response.status})`
             }
-            
-            set({ 
+
+            set({
               error: errorMessage,
               isLoading: false,
               isAuthenticated: false,
-              token: null
+              token: null,
             })
             return false
           }
         } catch (error) {
           console.error('Network error during auth:', error)
           let errorMessage = 'Authentication failed'
-          
+
           if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
             errorMessage = 'Unable to connect to server. Please check if the API is running.'
           } else if (error instanceof Error) {
@@ -128,25 +130,26 @@ export const useAuthStore = create<AuthState>()(
           } else {
             errorMessage = 'An unexpected error occurred during authentication'
           }
-          
-          set({ 
+
+          set({
             error: errorMessage,
             isLoading: false,
             isAuthenticated: false,
-            token: null
+            token: null,
           })
           return false
         }
       },
-      
+
       logout: () => {
-        set({ 
-          isAuthenticated: false, 
-          token: null, 
-          error: null 
+        set({
+          isAuthenticated: false,
+          token: null,
+          error: null,
+          lastAuthCheck: null,
         })
       },
-      
+
       checkAuth: async () => {
         const state = get()
         const { token, lastAuthCheck, isCheckingAuth, isAuthenticated } = state
@@ -159,6 +162,11 @@ export const useAuthStore = create<AuthState>()(
         // If no token, not authenticated
         if (!token) {
           return false
+        }
+
+        // Authentication not required
+        if (token === 'not-required') {
+          return true
         }
 
         // If we checked recently (within 30 seconds) and are authenticated, skip
@@ -176,15 +184,15 @@ export const useAuthStore = create<AuthState>()(
             method: 'GET',
             headers: {
               'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
+              'Content-Type': 'application/json',
+            },
           })
-          
+
           if (response.ok) {
-            set({ 
-              isAuthenticated: true, 
+            set({
+              isAuthenticated: true,
               lastAuthCheck: now,
-              isCheckingAuth: false 
+              isCheckingAuth: false,
             })
             return true
           } else {
@@ -192,31 +200,32 @@ export const useAuthStore = create<AuthState>()(
               isAuthenticated: false,
               token: null,
               lastAuthCheck: null,
-              isCheckingAuth: false
+              isCheckingAuth: false,
             })
             return false
           }
         } catch (error) {
           console.error('checkAuth error:', error)
-          set({ 
-            isAuthenticated: false, 
+          set({
+            isAuthenticated: false,
             token: null,
             lastAuthCheck: null,
-            isCheckingAuth: false 
+            isCheckingAuth: false,
           })
           return false
         }
-      }
+      },
     }),
     {
       name: 'auth-storage',
+      storage: authStorage,
       partialize: (state) => ({
         token: state.token,
-        isAuthenticated: state.isAuthenticated
+        isAuthenticated: state.isAuthenticated,
       }),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true)
-      }
+      },
     }
   )
 )

@@ -1,15 +1,17 @@
 # Load environment variables
+import os
+from contextlib import asynccontextmanager
+
 from dotenv import load_dotenv
 
 load_dotenv()
-
-from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from loguru import logger
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from api.auth import PasswordAuthMiddleware
 from open_notebook.exceptions import (
@@ -55,14 +57,68 @@ except Exception as e:
     logger.error(f"Failed to import commands in API process: {e}")
 
 
+def _env_flag(name: str, default: str = "false") -> bool:
+    value = os.environ.get(name, default)
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _get_allowed_origins() -> list[str]:
+    raw_origins = os.environ.get("OPEN_NOTEBOOK_ALLOWED_ORIGINS", "").strip()
+    if raw_origins:
+        origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
+        if origins:
+            return origins
+
+    return [
+        "http://localhost:8502",
+        "http://127.0.0.1:8502",
+    ]
+
+
+ALLOWED_ORIGINS = _get_allowed_origins()
+PUBLIC_DOCS = _env_flag("OPEN_NOTEBOOK_PUBLIC_DOCS", "false")
+
+
+def _get_request_origin(request: Request) -> str | None:
+    origin = request.headers.get("origin")
+    if origin and origin in ALLOWED_ORIGINS:
+        return origin
+    return None
+
+
+def _cors_headers(request: Request) -> dict[str, str]:
+    allowed_origin = _get_request_origin(request)
+    if not allowed_origin:
+        return {}
+
+    return {
+        "Access-Control-Allow-Origin": allowed_origin,
+        "Access-Control-Allow-Credentials": "true",
+        "Access-Control-Allow-Methods": "*",
+        "Access-Control-Allow-Headers": "*",
+        "Vary": "Origin",
+    }
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault(
+            "Permissions-Policy",
+            "camera=(), microphone=(), geolocation=()",
+        )
+        return response
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
     Lifespan event handler for the FastAPI application.
     Runs database migrations automatically on startup.
     """
-    import os
-
     # Startup: Security checks
     logger.info("Starting API initialization...")
 
@@ -75,7 +131,6 @@ async def lifespan(app: FastAPI):
         )
 
     # Run database migrations
-
     try:
         migration_manager = AsyncMigrationManager()
         current_version = await migration_manager.get_current_version()
@@ -119,11 +174,17 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Open Notebook API",
     description="API for Open Notebook - Research Assistant",
+    docs_url="/docs" if PUBLIC_DOCS else None,
+    redoc_url="/redoc" if PUBLIC_DOCS else None,
+    openapi_url="/openapi.json" if PUBLIC_DOCS else None,
     lifespan=lifespan,
 )
 
+app.add_middleware(SecurityHeadersMiddleware)
+
 # Add password authentication middleware first
-# Exclude /api/auth/status and /api/config from authentication
+# Keep auth/status public so the frontend can determine whether login is required.
+# Docs endpoints stay unprotected here so that, when disabled, they return 404 instead of 401.
 app.add_middleware(
     PasswordAuthMiddleware,
     excluded_paths=[
@@ -133,14 +194,13 @@ app.add_middleware(
         "/openapi.json",
         "/redoc",
         "/api/auth/status",
-        "/api/config",
     ],
 )
 
 # Add CORS middleware last (so it processes first)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific origins
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -159,29 +219,14 @@ async def custom_http_exception_handler(request: Request, exc: StarletteHTTPExce
     FastAPI, this handler won't be called. In that case, configure your reverse proxy
     to add CORS headers to error responses.
     """
-    # Get the origin from the request
-    origin = request.headers.get("origin", "*")
-
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail},
         headers={
-            **(exc.headers or {}), "Access-Control-Allow-Origin": origin,
-            "Access-Control-Allow-Credentials": "true",
-            "Access-Control-Allow-Methods": "*",
-            "Access-Control-Allow-Headers": "*",
+            **(exc.headers or {}),
+            **_cors_headers(request),
         },
     )
-
-
-def _cors_headers(request: Request) -> dict[str, str]:
-    origin = request.headers.get("origin", "*")
-    return {
-        "Access-Control-Allow-Origin": origin,
-        "Access-Control-Allow-Credentials": "true",
-        "Access-Control-Allow-Methods": "*",
-        "Access-Control-Allow-Headers": "*",
-    }
 
 
 @app.exception_handler(NotFoundError)
@@ -264,7 +309,9 @@ app.include_router(search.router, prefix="/api", tags=["search"])
 app.include_router(models.router, prefix="/api", tags=["models"])
 app.include_router(transformations.router, prefix="/api", tags=["transformations"])
 app.include_router(notes.router, prefix="/api", tags=["notes"])
-app.include_router(embedding.router, prefix="/api", tags=["embedding"])
+app.include_router(
+    embedding.router, prefix="/api", tags=["embedding"]
+)
 app.include_router(
     embedding_rebuild.router, prefix="/api/embeddings", tags=["embeddings"]
 )
@@ -274,8 +321,12 @@ app.include_router(sources.router, prefix="/api", tags=["sources"])
 app.include_router(insights.router, prefix="/api", tags=["insights"])
 app.include_router(commands_router.router, prefix="/api", tags=["commands"])
 app.include_router(podcasts.router, prefix="/api", tags=["podcasts"])
-app.include_router(episode_profiles.router, prefix="/api", tags=["episode-profiles"])
-app.include_router(speaker_profiles.router, prefix="/api", tags=["speaker-profiles"])
+app.include_router(
+    episode_profiles.router, prefix="/api", tags=["episode-profiles"]
+)
+app.include_router(
+    speaker_profiles.router, prefix="/api", tags=["speaker-profiles"]
+)
 app.include_router(chat.router, prefix="/api", tags=["chat"])
 app.include_router(source_chat.router, prefix="/api", tags=["source-chat"])
 app.include_router(credentials.router, prefix="/api", tags=["credentials"])

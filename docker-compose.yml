@@ -1,36 +1,72 @@
 services:
   surrealdb:
     image: surrealdb/surrealdb:v2
-    command: start --log info --user root --pass root rocksdb:/mydata/mydatabase.db
-    user: root  # Required for bind mounts on Linux
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./surreal_data:/mydata
+    command: >
+      start --log info
+      --user ${SURREAL_ROOT_USER:-open_notebook}
+      --pass ${SURREAL_ROOT_PASSWORD:?Set SURREAL_ROOT_PASSWORD in your .env file}
+      rocksdb:/mydata/mydatabase.db
+    user: root
+    expose:
+      - "8000"
     environment:
-      - SURREAL_EXPERIMENTAL_GRAPHQL=true
-    restart: always
-    pull_policy: always
+      SURREAL_EXPERIMENTAL_GRAPHQL: "true"
+    volumes:
+      - surreal_data:/mydata
+    restart: unless-stopped
 
   open_notebook:
-    image: lfnovo/open_notebook:v1-latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: open-notebook-archival:local
     ports:
-      - "8502:8502"  # Web UI
-      - "5055:5055"  # REST API
+      - "127.0.0.1:${FRONTEND_PORT:-8502}:8502"
+      - "127.0.0.1:${API_PORT:-5055}:5055"
     environment:
-      # REQUIRED: Change this to your own secret string
-      # This encrypts your API keys in the database
-      - OPEN_NOTEBOOK_ENCRYPTION_KEY=change-me-to-a-secret-string
+      # Required secrets
+      OPEN_NOTEBOOK_ENCRYPTION_KEY: ${OPEN_NOTEBOOK_ENCRYPTION_KEY:?Set OPEN_NOTEBOOK_ENCRYPTION_KEY in your .env file}
+      OPEN_NOTEBOOK_PASSWORD: ${OPEN_NOTEBOOK_PASSWORD:-}
 
-      # Database connection (default values - no need to change)
-      - SURREAL_URL=ws://surrealdb:8000/rpc
-      - SURREAL_USER=root
-      - SURREAL_PASSWORD=root
-      - SURREAL_NAMESPACE=open_notebook
-      - SURREAL_DATABASE=open_notebook
+      # Network hardening
+      OPEN_NOTEBOOK_ALLOWED_ORIGINS: ${OPEN_NOTEBOOK_ALLOWED_ORIGINS:-http://localhost:8502,http://127.0.0.1:8502}
+      OPEN_NOTEBOOK_PUBLIC_DOCS: ${OPEN_NOTEBOOK_PUBLIC_DOCS:-false}
+      OPEN_NOTEBOOK_ENABLE_UPDATE_CHECK: ${OPEN_NOTEBOOK_ENABLE_UPDATE_CHECK:-false}
+      OPEN_NOTEBOOK_TRUST_PROXY_HEADERS: ${OPEN_NOTEBOOK_TRUST_PROXY_HEADERS:-false}
+      OPEN_NOTEBOOK_ALLOW_PRIVATE_SOURCE_URLS: ${OPEN_NOTEBOOK_ALLOW_PRIVATE_SOURCE_URLS:-false}
+
+      # Auth hardening
+      OPEN_NOTEBOOK_AUTH_MAX_ATTEMPTS: ${OPEN_NOTEBOOK_AUTH_MAX_ATTEMPTS:-10}
+      OPEN_NOTEBOOK_AUTH_WINDOW_SECONDS: ${OPEN_NOTEBOOK_AUTH_WINDOW_SECONDS:-300}
+      OPEN_NOTEBOOK_AUTH_BLOCK_SECONDS: ${OPEN_NOTEBOOK_AUTH_BLOCK_SECONDS:-600}
+      OPEN_NOTEBOOK_AUTH_FAILURE_DELAY_MS: ${OPEN_NOTEBOOK_AUTH_FAILURE_DELAY_MS:-400}
+
+      # Upload limits
+      OPEN_NOTEBOOK_MAX_UPLOAD_BYTES: ${OPEN_NOTEBOOK_MAX_UPLOAD_BYTES:-52428800}
+
+      # Database connection
+      SURREAL_URL: ws://surrealdb:8000/rpc
+      SURREAL_USER: ${SURREAL_ROOT_USER:-open_notebook}
+      SURREAL_PASSWORD: ${SURREAL_ROOT_PASSWORD:?Set SURREAL_ROOT_PASSWORD in your .env file}
+      SURREAL_NAMESPACE: ${SURREAL_NAMESPACE:-open_notebook}
+      SURREAL_DATABASE: ${SURREAL_DATABASE:-open_notebook}
+
+      # Local model endpoints
+      OLLAMA_API_BASE: ${OLLAMA_API_BASE:-http://host.docker.internal:11434}
+      OPENAI_COMPATIBLE_BASE_URL: ${OPENAI_COMPATIBLE_BASE_URL:-}
+      OPENAI_COMPATIBLE_API_KEY: ${OPENAI_COMPATIBLE_API_KEY:-}
+      OPEN_NOTEBOOK_VERSION_REPOSITORY_URL: ${OPEN_NOTEBOOK_VERSION_REPOSITORY_URL:-https://github.com/vvillapalosUCM/OpenNotebook-Archival}
+      OPEN_NOTEBOOK_VERSION_REPOSITORY_BRANCH: ${OPEN_NOTEBOOK_VERSION_REPOSITORY_BRANCH:-main}
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
     volumes:
-      - ./notebook_data:/app/data
+      - notebook_data:/app/data
     depends_on:
       - surrealdb
-    restart: always
-    pull_policy: always
+    restart: unless-stopped
+
+volumes:
+  surreal_data:
+  notebook_data:
