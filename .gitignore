@@ -16,4 +16,9 @@ __pycache__/
 *.pyc
 
 # Dependencias Node
-node_modules/
+node_modules/ 
+# Metadatos de build Python 
+open_notebook.egg-info/ 
+ 
+# Ficheros de despliegue Windows originales (inseguros) 
+deployment/ 
