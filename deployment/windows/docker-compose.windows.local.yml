@@ -48,7 +48,7 @@ services:
       - SURREAL_EXPERIMENTAL_GRAPHQL=false
 
     restart: unless-stopped
-    pull_policy: never
+    pull_policy: missing  # pull solo en primera instalación
 
     networks:
       - on_internal

@@ -183,6 +183,9 @@ function Invoke-Compose([string[]]$Args) {
     Push-Location $script:WindowsDir
     try {
         & docker compose --env-file $script:EnvPath -f $script:ComposePath @Args
+        if ($LASTEXITCODE -ne 0) {
+            throw "docker compose exited with code $LASTEXITCODE"
+        }
     } finally {
         Pop-Location
     }
@@ -315,4 +318,7 @@ $surrealLogs
     throw $message
 }
 
-Export-ModuleMember -Function * -Variable WindowsDir, RepoRoot, RuntimeDir, EnvTemplatePath, EnvPath, ComposePath, BackupsDir, DiagnosticsPath
+# Note: Common.ps1 is loaded via dot-sourcing (. $path), not as a module.
+# All functions and $script: variables are automatically available in the
+# caller's scope. Do NOT use Export-ModuleMember here — it only works
+# inside .psm1 modules and will crash the script silently.
