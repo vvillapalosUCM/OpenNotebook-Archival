@@ -8,7 +8,7 @@ import { getConfig } from '@/lib/config'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, ShieldAlert } from 'lucide-react'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { useTranslation } from '@/lib/hooks/use-translation'
 
@@ -21,20 +21,20 @@ export function LoginForm() {
   const [configInfo, setConfigInfo] = useState<{ apiUrl: string; version: string; buildTime: string } | null>(null)
   const router = useRouter()
 
-  // Load config info for debugging
   useEffect(() => {
-    getConfig().then(cfg => {
-      setConfigInfo({
-        apiUrl: cfg.apiUrl,
-        version: cfg.version,
-        buildTime: cfg.buildTime,
+    getConfig()
+      .then(cfg => {
+        setConfigInfo({
+          apiUrl: cfg.apiUrl,
+          version: cfg.version,
+          buildTime: cfg.buildTime,
+        })
       })
-    }).catch(err => {
-      console.error('Failed to load config:', err)
-    })
+      .catch(err => {
+        console.error('Failed to load config:', err)
+      })
   }, [])
 
-  // Check if authentication is required on mount
   useEffect(() => {
     if (!hasHydrated) {
       return
@@ -44,19 +44,16 @@ export function LoginForm() {
       try {
         const required = await checkAuthRequired()
 
-        // If auth is not required, redirect to notebooks
         if (!required) {
           router.push('/notebooks')
         }
       } catch (error) {
         console.error('Error checking auth requirement:', error)
-        // On error, assume auth is required to be safe
       } finally {
         setIsCheckingAuth(false)
       }
     }
 
-    // If we already know auth status, use it
     if (authRequired !== null) {
       if (!authRequired && isAuthenticated) {
         router.push('/notebooks')
@@ -68,7 +65,6 @@ export function LoginForm() {
     }
   }, [hasHydrated, authRequired, checkAuthRequired, router, isAuthenticated])
 
-  // Show loading while checking if auth is required
   if (!hasHydrated || isCheckingAuth) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -77,7 +73,6 @@ export function LoginForm() {
     )
   }
 
-  // If we still don't know if auth is required (connection error), show error
   if (authRequired === null) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -90,6 +85,20 @@ export function LoginForm() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
+              <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
+                <div className="flex items-start gap-2">
+                  <ShieldAlert className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="font-medium">Ámbito de uso de esta instalación</div>
+                    <div className="mt-1">
+                      OpenNotebook-Archival está pensado exclusivamente para uso local,
+                      en este equipo y por una sola persona. No está diseñado como
+                      servicio en red ni como herramienta multiusuario.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="flex items-start gap-2 text-red-600 text-sm">
                 <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
                 <div className="flex-1">
@@ -102,8 +111,17 @@ export function LoginForm() {
                   <div className="font-medium">{t.common.diagnosticInfo}:</div>
                   <div className="space-y-1 font-mono">
                     <div>{t.common.version}: {configInfo.version}</div>
-                    <div>{t.common.built}: {new Date(configInfo.buildTime).toLocaleString(language === 'zh-CN' ? 'zh-CN' : language === 'zh-TW' ? 'zh-TW' : 'en-US')}</div>
-                    <div className="break-all">{t.common.apiUrl}: {configInfo.apiUrl}</div>
+                    <div>
+                      {t.common.built}:{' '}
+                      {new Date(configInfo.buildTime).toLocaleString(
+                        language === 'zh-CN'
+                          ? 'zh-CN'
+                          : language === 'zh-TW'
+                            ? 'zh-TW'
+                            : 'en-US'
+                      )}
+                    </div>
+                    <div className="break-all">{t.common.apiUrl}: {configInfo.apiUrl || '(ruta relativa local)'}</div>
                     <div className="break-all">{t.common.frontendUrl}: {typeof window !== 'undefined' ? window.location.href : 'N/A'}</div>
                   </div>
                   <div className="text-xs pt-2">
@@ -132,7 +150,6 @@ export function LoginForm() {
         await login(password)
       } catch (error) {
         console.error('Unhandled error during login:', error)
-        // The auth store should handle most errors, but this catches any unhandled ones
       }
     }
   }
@@ -147,6 +164,20 @@ export function LoginForm() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
+            <div className="flex items-start gap-2">
+              <ShieldAlert className="h-4 w-4 mt-0.5 flex-shrink-0" />
+              <div>
+                <div className="font-medium">Modo local personal</div>
+                <div className="mt-1">
+                  Esta instalación está diseñada exclusivamente para uso local,
+                  en este equipo y por una sola persona. No debe utilizarse
+                  como servicio en red ni compartirse con otros usuarios.
+                </div>
+              </div>
+            </div>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <Input
@@ -173,10 +204,18 @@ export function LoginForm() {
               {isLoading ? t.auth.signingIn : t.auth.signIn}
             </Button>
 
+            <div className="rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
+              La clave solicitada aquí protege el acceso local a esta sesión del navegador.
+              No sustituye un sistema de autenticación multiusuario ni convierte
+              la aplicación en una plataforma de red.
+            </div>
+
             {configInfo && (
               <div className="text-xs text-center text-muted-foreground pt-2 border-t">
                 <div>{t.common.version} {configInfo.version}</div>
-                <div className="font-mono text-[10px]">{configInfo.apiUrl}</div>
+                <div className="font-mono text-[10px]">
+                  {configInfo.apiUrl || '(ruta relativa local)'}
+                </div>
               </div>
             )}
           </form>

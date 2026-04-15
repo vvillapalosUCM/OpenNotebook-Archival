@@ -1,44 +1,68 @@
 # OpenNotebook-Archival
 
-OpenNotebook-Archival es un fork orientado a archivos, bibliotecas y entornos GLAM que prioriza despliegue local, privacidad, trazabilidad y adaptación institucional. Su enfoque no es “usar más proveedores”, sino ofrecer una base controlada para trabajar con modelos locales —especialmente Ollama— y con documentación sensible.
+OpenNotebook-Archival es un fork orientado a archivos, bibliotecas y trabajo documental con un objetivo deliberadamente acotado: servir como herramienta de uso estrictamente local y personal para profesionales que necesitan trabajar con documentación sensible y modelos locales desde su propio equipo.
 
-Este repositorio parte del trabajo original de `lfnovo/open-notebook`, pero aquí se reorienta a un escenario archivístico y de investigación documental: instalación local, endurecimiento de seguridad, configuración comprensible y futura especialización funcional para descripción, análisis y transformación documental.
+## Alcance del proyecto
+
+Este proyecto está diseñado exclusivamente para:
+
+- uso local en `localhost` o `127.0.0.1`;
+- una sola persona usuaria por instalación;
+- trabajo en el propio equipo del profesional;
+- uso preferente con modelos locales, especialmente Ollama, o con endpoints expresamente configurados por la propia persona usuaria bajo su responsabilidad.
+
+Este proyecto **no está diseñado ni soportado** para:
+
+- acceso desde otros equipos de la red;
+- uso multiusuario;
+- exposición a Internet;
+- despliegue como servicio institucional compartido;
+- sustitución de una plataforma corporativa con autenticación, auditoría y administración centralizada.
+
+## Filosofía del fork
+
+OpenNotebook-Archival no pretende convertirse en una plataforma SaaS ni en un servicio web empresarial. Su propósito es más concreto: ofrecer un cuaderno documental local, privado y controlable para trabajo individual con fuentes sensibles y modelos locales.
+
+## Qué significa “seguridad” en este proyecto
+
+La seguridad de este fork debe interpretarse dentro de su modelo de uso:
+
+- reducir exposición accidental en red;
+- mantener la aplicación confinada a `localhost`;
+- dificultar errores de configuración comunes;
+- proteger de accesos casuales al interfaz en el propio equipo;
+- favorecer trazabilidad y control local del trabajo documental.
+
+Esto no significa que la aplicación esté preparada para operar como servicio abierto, multiusuario o institucional sin rediseño adicional.
+
+## Declaración de soporte
+
+Solo se considera configuración soportada aquella en la que:
+
+- la aplicación se ejecuta en el propio equipo del usuario;
+- frontend y API están publicados únicamente en `127.0.0.1`;
+- no existe acceso desde otros dispositivos;
+- no se usa como herramienta compartida entre varias personas;
+- no se expone mediante túneles, reverse proxy público o publicación en Internet.
+
+Cualquier uso fuera de ese perímetro debe considerarse fuera de alcance del proyecto.
 
 ## Estado actual del fork
 
-La base funcional existe, pero este fork sigue en fase de saneamiento estructural. Antes de ampliar funciones archivísticas conviene dejar cerradas estas capas:
+La base funcional existe y el despliegue principal se orienta a build local del propio fork, con frontend y API enlazados a `127.0.0.1`. El objetivo del proyecto no es crecer hacia “más red”, sino reforzar su identidad como herramienta local, personal y documental.
 
-- seguridad del backend y del despliegue;
-- instalación reproducible en Windows;
-- documentación alineada con el fork;
-- defaults seguros para uso local e institucional.
+## Qué se ha corregido en esta línea del fork
 
-## Qué se ha corregido en esta tanda
-
-Esta versión de archivos deja preparada una línea de trabajo más segura y coherente:
-
+- `docker-compose.yml` principal orientado al build local del fork.
+- `docker-compose.windows.local.yml` orientado también a build local.
+- frontend y API publicados en `127.0.0.1`.
+- SurrealDB no publicado al host.
 - CORS restringido a orígenes explícitos.
-- `/api/config` deja de ser público.
 - documentación Swagger/ReDoc controlada por variable de entorno.
 - cabeceras HTTP de seguridad en backend y frontend.
 - almacenamiento de autenticación en `sessionStorage` en vez de `localStorage`.
-- validación de rutas de audio de podcasts para evitar lecturas fuera del directorio previsto.
-- `Dockerfile` preparado para ejecutar como usuario no privilegiado.
-- `docker-compose.yml` principal orientado al build local del fork, no a la imagen upstream.
-- creación del compose específico para Windows que faltaba en el repositorio.
-- instalador de Windows con contraseña oculta y política mínima más exigente.
-- actualización de comprobación de versión apuntando al fork, no al upstream.
-
-## Identidad del proyecto
-
-Este fork está pensado para:
-
-- profesionales de archivos, bibliotecas, documentación y gestión del conocimiento;
-- uso local o semilocal dentro de red controlada;
-- integración futura con Ollama y endpoints OpenAI-compatible locales;
-- extensiones archivísticas como transformaciones ISAD(G), extracción de metadatos y exportación interoperable.
-
-No está planteado como producto SaaS ni como entorno multiusuario abierto a Internet sin una capa adicional de reverse proxy, TLS y endurecimiento de sistema.
+- validación de rutas de descarga y audio más estricta.
+- instalación de Windows con flujo más guiado para entorno local.
 
 ## Instalación rápida en Linux/macOS
 
@@ -54,10 +78,8 @@ docker compose up -d --build
 
 La aplicación quedará accesible en:
 
-- frontend: `http://localhost:8502`
-- API: `http://localhost:5055`
-
-Por defecto, el `docker-compose.yml` principal publica solo frontend y API en `127.0.0.1`. SurrealDB no se publica externamente.
+- frontend: `http://127.0.0.1:8502`
+- API: `http://127.0.0.1:5055`
 
 ## Instalación en Windows
 
@@ -82,14 +104,15 @@ El instalador:
 
 ## Variables de entorno relevantes
 
-### Seguridad y autenticación
+### Seguridad y acceso local
 
-- `OPEN_NOTEBOOK_PASSWORD`: contraseña de acceso a la aplicación.
+- `OPEN_NOTEBOOK_PASSWORD`: clave de acceso local a la aplicación.
 - `OPEN_NOTEBOOK_ENCRYPTION_KEY`: clave de cifrado para credenciales almacenadas.
 - `OPEN_NOTEBOOK_ALLOWED_ORIGINS`: lista CSV de orígenes permitidos para CORS.
 - `OPEN_NOTEBOOK_PUBLIC_DOCS`: `true` o `false` para exponer Swagger/ReDoc.
 - `OPEN_NOTEBOOK_ENABLE_UPDATE_CHECK`: activa o desactiva la comprobación de actualizaciones.
 - `OPEN_NOTEBOOK_ALLOW_PRIVATE_SOURCE_URLS`: controla si se permiten URLs privadas en fuentes.
+- `OPEN_NOTEBOOK_ALLOW_NO_PASSWORD`: solo para desarrollo local consciente; no recomendado.
 
 ### Base de datos
 
@@ -101,63 +124,18 @@ El instalador:
 ### Modelos locales
 
 - `OLLAMA_API_BASE`: endpoint de Ollama visto desde el contenedor.
-- `OPENAI_COMPATIBLE_BASE_URL`: endpoint compatible con OpenAI en local o red privada.
+- `OPENAI_COMPATIBLE_BASE_URL`: endpoint compatible con OpenAI configurado expresamente por la persona usuaria.
 - `OPENAI_COMPATIBLE_API_KEY`: credencial opcional para dicho endpoint.
 
-## Consideraciones de seguridad
+## Qué no debe hacerse
 
-Este fork se orienta a un despliegue local endurecido, pero eso no convierte automáticamente la aplicación en apta para Internet abierta. Si vas a exponerla fuera de localhost, debes añadir como mínimo:
+No utilices este proyecto:
 
-- TLS terminado correctamente;
-- reverse proxy controlado;
-- política de logs y copias de seguridad;
-- revisión de permisos y puertos;
-- endurecimiento del host.
-
-Recomendaciones inmediatas:
-
-- no reutilices contraseñas;
-- usa secretos largos y aleatorios;
-- no actives `OPEN_NOTEBOOK_PUBLIC_DOCS` salvo necesidad real;
-- mantén `OPEN_NOTEBOOK_ALLOW_PRIVATE_SOURCE_URLS=false` mientras no haya un caso justificado;
-- si cambias el puerto del frontend, actualiza también `OPEN_NOTEBOOK_ALLOWED_ORIGINS`.
-
-## Orientación funcional del fork
-
-La dirección natural de OpenNotebook-Archival no es competir por cantidad de proveedores ni por marketing de “productividad genérica”. Su valor diferencial está en:
-
-- adaptación al trabajo archivístico y documental;
-- apoyo a análisis local de fuentes;
-- transformaciones especializadas;
-- trazabilidad y control institucional;
-- integración futura con herramientas como ArchivesSpace, AtoM o flujos exportables.
-
-Líneas funcionales previstas:
-
-- prompts archivísticos especializados;
-- transformaciones predefinidas para ISAD(G) y tareas de análisis documental;
-- mayor simplificación de la UI para escenarios solo-locales;
-- internacionalización al español;
-- exportaciones orientadas a entornos GLAM.
-
-## Diferencias respecto al upstream
-
-Este fork no debe seguir presentándose como una simple copia de Open Notebook. A nivel documental y operativo se recomienda mantener:
-
-- identidad propia del fork;
-- documentación propia de instalación;
-- política de versiones propia;
-- referencias al upstream solo como atribución técnica, no como centro del proyecto.
-
-## Desarrollo
-
-Para trabajar sobre el código del fork:
-
-```bash
-docker compose up -d --build
-```
-
-El compose principal ya está planteado para construir la imagen desde este mismo repositorio. Eso evita el problema anterior de estar modificando el código del fork mientras el despliegue seguía ejecutando la imagen upstream.
+- como servicio compartido entre trabajadores;
+- como aplicación accesible desde la LAN;
+- detrás de un reverse proxy para terceros;
+- como servicio publicado en Internet;
+- como sustituto de una solución corporativa con identidades, trazabilidad y administración centralizadas.
 
 ## Estructura útil del repositorio
 
@@ -165,12 +143,11 @@ El compose principal ya está planteado para construir la imagen desde este mism
 - `frontend/`: interfaz Next.js
 - `commands/`: comandos y trabajos de procesamiento
 - `open_notebook/`: dominio y lógica principal
-- `configs/archival/`: compose alternativo local-only
 - `deployment/windows/`: instalación guiada para Windows
 
 ## Créditos
 
-Proyecto derivado del trabajo original de `lfnovo/open-notebook`, adaptado aquí como fork orientado a necesidades archivísticas y documentales.
+Proyecto derivado del trabajo original de `lfnovo/open-notebook`, adaptado aquí como fork orientado a necesidades archivísticas y documentales con foco en uso local y personal.
 
 ## Licencia
 

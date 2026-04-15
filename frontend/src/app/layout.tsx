@@ -12,8 +12,9 @@ import { I18nProvider } from "@/components/providers/I18nProvider";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Open Notebook",
-  description: "Privacy-focused research and knowledge management",
+  title: "OpenNotebook-Archival",
+  description:
+    "Herramienta documental de uso local y personal para trabajo individual con modelos locales.",
 };
 
 export default function RootLayout({
@@ -22,7 +23,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="es" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
@@ -32,6 +33,12 @@ export default function RootLayout({
             <QueryProvider>
               <I18nProvider>
                 <ConnectionGuard>
+                  <div className="border-b bg-amber-50 px-4 py-2 text-xs text-amber-950 dark:bg-amber-950 dark:text-amber-100">
+                    <strong>Modo local personal.</strong>{" "}
+                    Esta instalación está diseñada exclusivamente para uso local,
+                    en este equipo y por una sola persona. No debe utilizarse
+                    como servicio en red ni compartirse con otros usuarios.
+                  </div>
                   {children}
                   <Toaster />
                 </ConnectionGuard>
