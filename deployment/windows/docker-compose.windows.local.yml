@@ -80,7 +80,10 @@ services:
   # Frontend y API solo en 127.0.0.1.
   # --------------------------------------------------------------------------
   open_notebook:
-    image: lfnovo/open_notebook:v1-latest
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    image: opennotebook-archival:local
     container_name: on-app
 
     ports:

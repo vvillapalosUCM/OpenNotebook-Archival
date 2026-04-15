@@ -84,7 +84,7 @@ const PROVIDER_MODALITIES: Record<string, ModelType[]> = {
 
 const PROVIDER_DOCS: Record<string, string> = {
   openai_compatible:
-    'https://github.com/lfnovo/open-notebook/blob/main/docs/5-CONFIGURATION/openai-compatible.md',
+    'https://github.com/vvillapalosUCM/OpenNotebook-Archival/blob/main/docs/5-CONFIGURATION/openai-compatible.md',
 }
 
 const TYPE_ICONS: Record<ModelType, React.ReactNode> = {
@@ -1333,7 +1333,7 @@ export default function ApiKeysPage() {
 
           <div className="border-t pt-4">
             <a
-              href="https://github.com/lfnovo/open-notebook/blob/main/docs/5-CONFIGURATION/openai-compatible.md"
+              href="https://github.com/vvillapalosUCM/OpenNotebook-Archival/blob/main/docs/5-CONFIGURATION/openai-compatible.md"
               target="_blank"
               rel="noopener noreferrer"
               className="text-sm text-primary hover:underline"

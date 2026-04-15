@@ -90,6 +90,9 @@ class PasswordAuthMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
         if not self.password:
+            # This path is only reachable if OPEN_NOTEBOOK_ALLOW_NO_PASSWORD=true
+            # was set explicitly. The lifespan check in main.py blocks startup
+            # without a password by default.
             return await call_next(request)
 
         if request.url.path in self.excluded_paths:

@@ -130,6 +130,23 @@ async def lifespan(app: FastAPI):
             "Set OPEN_NOTEBOOK_ENCRYPTION_KEY to any secret string."
         )
 
+    # Security check: Authentication password (fail-closed)
+    if not get_secret_from_env("OPEN_NOTEBOOK_PASSWORD"):
+        if _env_flag("OPEN_NOTEBOOK_ALLOW_NO_PASSWORD", "false"):
+            logger.critical(
+                "OPEN_NOTEBOOK_PASSWORD not set and OPEN_NOTEBOOK_ALLOW_NO_PASSWORD=true. "
+                "The API is running WITHOUT authentication. "
+                "This is only acceptable for local development."
+            )
+        else:
+            raise RuntimeError(
+                "OPEN_NOTEBOOK_PASSWORD is not set. "
+                "The API refuses to start without authentication to prevent accidental exposure. "
+                "Set OPEN_NOTEBOOK_PASSWORD to a strong password in your .env file. "
+                "If you intentionally want to run without authentication (development only), "
+                "set OPEN_NOTEBOOK_ALLOW_NO_PASSWORD=true."
+            )
+
     # Run database migrations
     try:
         migration_manager = AsyncMigrationManager()

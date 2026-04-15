@@ -551,7 +551,7 @@ async def _resolve_source_file(source_id: str) -> tuple[str, str]:
     safe_root = os.path.realpath(UPLOADS_FOLDER)
     resolved_path = os.path.realpath(file_path)
 
-    if not resolved_path.startswith(safe_root):
+    if not resolved_path.startswith(safe_root + os.sep):
         logger.warning(f"Blocked download outside uploads directory for source {source_id}: {resolved_path}")
         raise HTTPException(status_code=403, detail="Access to file denied")
 
@@ -570,7 +570,7 @@ def _is_source_file_available(source: Source) -> Optional[bool]:
     safe_root = os.path.realpath(UPLOADS_FOLDER)
     resolved_path = os.path.realpath(file_path)
 
-    if not resolved_path.startswith(safe_root):
+    if not resolved_path.startswith(safe_root + os.sep):
         return False
 
     return os.path.exists(resolved_path)

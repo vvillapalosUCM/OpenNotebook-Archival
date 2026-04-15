@@ -1,14 +1,15 @@
 # ============================================================================
-# OpenNotebook — Despliegue Local Endurecido
+# OpenNotebook Archival — Despliegue Local Endurecido
 # ============================================================================
 # Diseñado para uso exclusivamente local (127.0.0.1) en equipos Windows
 # con Docker Desktop. Optimizado para el sector GLAM / archivístico.
 #
 # Principios de seguridad aplicados:
-#   1. SurrealDB NO publica puertos al host (solo red interna Docker)
-#   2. Frontend y API solo escuchan en localhost (127.0.0.1)
-#   3. Credenciales de BD no triviales (definidas en .env)
-#   4. Imágenes fijadas a versión concreta (sin pull automático)
+#   1. La imagen de la aplicación se construye localmente desde este
+#      repositorio (no se descarga de Docker Hub ni de GHCR upstream)
+#   2. SurrealDB NO publica puertos al host (solo red interna Docker)
+#   3. Frontend y API solo escuchan en localhost (127.0.0.1)
+#   4. Credenciales de BD no triviales (definidas en .env)
 #   5. Contenedores sin privilegios elevados
 #   6. Red interna aislada para comunicación entre servicios
 #   7. Sin llamadas de actualización automática al exterior
@@ -18,7 +19,7 @@
 #
 # USO:
 #   1. Copiar .env.hardened a .env y personalizar las contraseñas
-#   2. docker compose up -d
+#   2. docker compose up -d --build
 #   3. Abrir http://127.0.0.1:8502
 #
 # IMPORTANTE: Verificar que se usa v1.8.3 o superior (parche CVE inyección
@@ -96,7 +97,10 @@ services:
   # Frontend (8502) y API (5055) solo en 127.0.0.1.
   # --------------------------------------------------------------------------
   open_notebook:
-    image: lfnovo/open_notebook:v1-latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: opennotebook-archival:local
     container_name: on-app
 
     ports:
