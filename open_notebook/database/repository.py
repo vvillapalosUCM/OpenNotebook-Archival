@@ -1,4 +1,5 @@
 import os
+import re
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, TypeVar, Union
@@ -7,6 +8,50 @@ from loguru import logger
 from surrealdb import AsyncSurreal, RecordID  # type: ignore
 
 T = TypeVar("T", Dict[str, Any], List[Dict[str, Any]])
+
+# Strict pattern for SurrealDB identifiers (tables, relationships).
+# Allows alphanumeric characters and underscores only.
+_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+# Pattern for record IDs: table:id_part
+# id_part may contain alphanumeric, hyphens, underscores, and some special chars
+# used by SurrealDB's auto-generated IDs.
+_RECORD_ID_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*:[A-Za-z0-9_\-]+$")
+
+
+def _validate_identifier(value: str, label: str = "identifier") -> str:
+    """Validate that a value is a safe SurrealDB identifier (table name, relationship).
+
+    Raises ValueError if the value contains characters that could enable
+    SurrealQL injection when interpolated into a query string.
+    """
+    if not value or not _IDENTIFIER_RE.match(value):
+        raise ValueError(
+            f"Invalid SurrealDB {label}: '{value}'. "
+            f"Only alphanumeric characters and underscores are allowed."
+        )
+    return value
+
+
+def _validate_record_ref(value: str, label: str = "record reference") -> str:
+    """Validate that a value is a safe SurrealDB record reference (table:id or table name).
+
+    Accepts both plain table names and table:id format.
+    """
+    if isinstance(value, RecordID):
+        return str(value)
+    if not value:
+        raise ValueError(f"Empty {label}")
+    # Allow plain table names
+    if _IDENTIFIER_RE.match(value):
+        return value
+    # Allow table:id format
+    if _RECORD_ID_RE.match(value):
+        return value
+    raise ValueError(
+        f"Invalid SurrealDB {label}: '{value}'. "
+        f"Expected format: 'table_name' or 'table_name:record_id'."
+    )
 
 
 def get_database_url():
@@ -109,7 +154,11 @@ async def repo_relate(
     """Create a relationship between two records with optional data"""
     if data is None:
         data = {}
-    query = f"RELATE {source}->{relationship}->{target} CONTENT $data;"
+    # Validate interpolated identifiers to prevent SurrealQL injection
+    safe_source = _validate_record_ref(source, "source")
+    safe_rel = _validate_identifier(relationship, "relationship")
+    safe_target = _validate_record_ref(target, "target")
+    query = f"RELATE {safe_source}->{safe_rel}->{safe_target} CONTENT $data;"
     # logger.debug(f"Relate query: {query}")
 
     return await repo_query(
@@ -127,7 +176,9 @@ async def repo_upsert(
     data.pop("id", None)
     if add_timestamp:
         data["updated"] = datetime.now(timezone.utc)
-    query = f"UPSERT {id if id else table} MERGE $data;"
+    # Validate interpolated identifiers to prevent SurrealQL injection
+    safe_ref = _validate_record_ref(id, "record id") if id else _validate_identifier(table, "table")
+    query = f"UPSERT {safe_ref} MERGE $data;"
     return await repo_query(query, {"data": data})
 
 
@@ -135,17 +186,18 @@ async def repo_update(
     table: str, id: str, data: Dict[str, Any]
 ) -> List[Dict[str, Any]]:
     """Update an existing record by table and id"""
-    # If id already contains the table name, use it as is
     try:
         if isinstance(id, RecordID) or (":" in id and id.startswith(f"{table}:")):
             record_id = id
         else:
             record_id = f"{table}:{id}"
+        # Validate interpolated identifier to prevent SurrealQL injection
+        safe_ref = _validate_record_ref(record_id, "record id") if not isinstance(record_id, RecordID) else str(record_id)
         data.pop("id", None)
         if "created" in data and isinstance(data["created"], str):
             data["created"] = datetime.fromisoformat(data["created"])
         data["updated"] = datetime.now(timezone.utc)
-        query = f"UPDATE {record_id} MERGE $data;"
+        query = f"UPDATE {safe_ref} MERGE $data;"
         # logger.debug(f"Update query: {query}")
         result = await repo_query(query, {"data": data})
         # if isinstance(result, list):

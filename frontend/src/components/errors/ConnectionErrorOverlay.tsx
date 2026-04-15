@@ -116,8 +116,8 @@ export function ConnectionErrorOverlay({
           </a>
         </div>
 
-        {/* Collapsible technical details */}
-        {error.details && (
+        {/* Collapsible technical details — reduced to prevent information leakage */}
+        {error.details && error.details.message && (
           <Collapsible open={showDetails} onOpenChange={setShowDetails}>
             <CollapsibleTrigger asChild>
               <Button variant="ghost" size="sm" className="w-full justify-between">
@@ -131,30 +131,9 @@ export function ConnectionErrorOverlay({
             </CollapsibleTrigger>
             <CollapsibleContent className="pt-4">
               <div className="space-y-2 text-sm bg-muted p-4 rounded font-mono">
-                {error.details.attemptedUrl && (
-                  <div>
-                    <strong>{t.connectionErrors.attemptedUrl}:</strong> {error.details.attemptedUrl}
-                  </div>
-                )}
-                {error.details.message && (
-                  <div>
-                    <strong>{t.connectionErrors.message}:</strong> {error.details.message}
-                  </div>
-                )}
-                {error.details.technicalMessage && (
-                  <div>
-                    <strong>{t.connectionErrors.technicalDetails}:</strong>{' '}
-                    {error.details.technicalMessage}
-                  </div>
-                )}
-                {error.details.stack && (
-                  <div>
-                    <strong>{t.connectionErrors.stackTrace}:</strong>
-                    <pre className="mt-2 overflow-x-auto text-xs">
-                      {error.details.stack}
-                    </pre>
-                  </div>
-                )}
+                <div>
+                  <strong>{t.connectionErrors.message}:</strong> {error.details.message}
+                </div>
               </div>
             </CollapsibleContent>
           </Collapsible>

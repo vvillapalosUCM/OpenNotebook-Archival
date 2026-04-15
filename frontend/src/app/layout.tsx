@@ -12,7 +12,7 @@ import { I18nProvider } from "@/components/providers/I18nProvider";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "OpenNotebook-Archival",
+  title: "Open ArchiBook LLM",
   description:
     "Herramienta documental de uso local y personal para trabajo individual con modelos locales.",
 };

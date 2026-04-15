@@ -1,5 +1,5 @@
 # Build stage
-FROM python:3.12-slim-bookworm AS builder
+FROM python:3.12.13-slim-bookworm AS builder  # pinned — update periodically
 
 # Install uv — pinned to specific version to prevent supply-chain drift
 COPY --from=ghcr.io/astral-sh/uv:0.11.6 /uv /uvx /bin/
@@ -54,7 +54,7 @@ RUN npm run build
 WORKDIR /app
 
 # Runtime stage
-FROM python:3.12-slim-bookworm AS runtime
+FROM python:3.12.13-slim-bookworm AS runtime  # pinned — update periodically
 
 # Install only runtime system dependencies (no build tools)
 RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \

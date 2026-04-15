@@ -179,6 +179,17 @@ async def lifespan(app: FastAPI):
         logger.warning(f"Podcast profile migration encountered errors: {e}")
         # Non-fatal: profiles can be migrated manually via UI
 
+    # Seed archival transformations on first startup (GLAM fork)
+    try:
+        from open_notebook.seed_transformations import seed_archival_transformations
+
+        seeded = await seed_archival_transformations()
+        if seeded:
+            logger.info(f"Seeded {seeded} archival transformations for first-time setup")
+    except Exception as e:
+        logger.warning(f"Archival transformation seeding skipped: {e}")
+        # Non-fatal: transformations can be created manually via UI
+
     logger.success("API initialization completed successfully")
 
     # Yield control to the application
