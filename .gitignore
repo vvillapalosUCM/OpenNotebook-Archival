@@ -20,5 +20,6 @@ node_modules/
 # Metadatos de build Python 
 open_notebook.egg-info/ 
  
-# Ficheros de despliegue Windows originales (inseguros) 
-deployment/ 
+# Datos de runtime generados por el instalador Windows (contienen contraseñas)
+deployment/windows/runtime/
+deployment/windows/backups/

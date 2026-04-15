@@ -1,8 +1,8 @@
 # Build stage
 FROM python:3.12-slim-bookworm AS builder
 
-# Install uv using the official method
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+# Install uv — pinned to specific version to prevent supply-chain drift
+COPY --from=ghcr.io/astral-sh/uv:0.11.6 /uv /uvx /bin/
 
 # Install system dependencies required for building certain Python packages
 # Use Debian packages for Node.js/NPM instead of curl|bash installer scripts.
@@ -63,8 +63,8 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
     supervisor \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv using the official method
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+# Install uv — pinned to same version as builder stage
+COPY --from=ghcr.io/astral-sh/uv:0.11.6 /uv /uvx /bin/
 
 # Set the working directory in the container to /app
 WORKDIR /app

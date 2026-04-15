@@ -14,6 +14,26 @@ en abril de 2026.
 
 ---
 
+## Convención de nombres de variables
+
+Todas las configuraciones (.env.hardened, .env.example, env.template de
+Windows) usan la **misma nomenclatura**:
+
+| Variable               | Uso                                  |
+|------------------------|--------------------------------------|
+| `FRONTEND_PORT`        | Puerto del frontend (antes APP_PORT) |
+| `API_PORT`             | Puerto de la API                     |
+| `SURREAL_ROOT_USER`    | Usuario admin de SurrealDB           |
+| `SURREAL_ROOT_PASSWORD`| Contraseña admin de SurrealDB        |
+| `OPEN_NOTEBOOK_PASSWORD` | Contraseña de acceso a la app      |
+| `OPEN_NOTEBOOK_ENCRYPTION_KEY` | Clave de cifrado Fernet       |
+
+Los archivos compose mapean internamente `SURREAL_ROOT_USER` →
+`SURREAL_USER` y `SURREAL_ROOT_PASSWORD` → `SURREAL_PASSWORD` para
+compatibilidad con la imagen upstream de Open Notebook.
+
+---
+
 ## Problemas detectados y correcciones aplicadas
 
 ### 1. SurrealDB expuesta al exterior
@@ -41,9 +61,10 @@ docker port on-surrealdb
 y documenta estas credenciales como valores por defecto. Combinado con el
 puerto abierto, cualquiera en la red tiene acceso total a la BD.
 
-**Corrección:** Las credenciales se definen en el fichero `.env` y deben
-cambiarse obligatoriamente antes del primer arranque. El usuario por defecto
-es `on_admin` en lugar de `root`.
+**Corrección:** Las credenciales se definen en el fichero `.env` como
+`SURREAL_ROOT_USER` y `SURREAL_ROOT_PASSWORD` y deben cambiarse
+obligatoriamente antes del primer arranque. El usuario por defecto es
+`on_admin` en lugar de `root`.
 
 ### 3. Frontend y API abiertos a toda la red
 
@@ -101,6 +122,10 @@ docker compose pull
 docker compose up -d
 ```
 
+Además, las dependencias de build están fijadas a versiones concretas:
+- `uv` → `0.11.6` (antes `latest`)
+- `surrealdb` → `v2.1.4` (antes `v2`)
+
 ### 7. Contenedor SurrealDB como root
 
 **Problema:** El compose oficial usa `user: root` en el servicio SurrealDB,
@@ -139,6 +164,59 @@ endpoints externos, filtrando datos.
 **Corrección:** Estas variables están comentadas por defecto en `.env.hardened`.
 Solo se descomentan si el usuario decide conscientemente usar un servicio
 externo.
+
+### 11. Dockerfile single-container ejecutaba como root
+
+**Problema:** `Dockerfile.single` no creaba un usuario sin privilegios ni
+usaba la directiva `USER`. Todo el stack (SurrealDB + API + frontend) corría
+como root dentro del contenedor. Además, `supervisord.single.conf` tenía
+credenciales `root/root` hardcodeadas.
+
+**Corrección:**
+- Se crea el usuario `notebook` sin privilegios (igual que el Dockerfile
+  principal).
+- Las credenciales de SurrealDB en supervisord se leen de variables de
+  entorno (`%(ENV_SURREAL_USER)s`).
+- Se elimina el patrón `curl | bash` para Node.js, usando paquetes Debian.
+
+### 12. Faltaba el archivo de compose para Windows
+
+**Problema:** Los scripts de `deployment/windows/` referencian
+`docker-compose.windows.local.yml`, pero el archivo no existía en el
+repositorio. Además, `.gitignore` excluía todo `deployment/`, impidiendo
+que archivos nuevos se pudieran commitear.
+
+**Corrección:**
+- Se ha creado `deployment/windows/docker-compose.windows.local.yml`.
+- Se ha corregido `.gitignore` para excluir solo `runtime/` y `backups/`
+  en lugar de todo `deployment/`.
+
+---
+
+## Limitaciones conocidas de la Content Security Policy (CSP)
+
+El frontend Next.js define una CSP en `next.config.ts` con las siguientes
+limitaciones aceptadas:
+
+### `script-src 'unsafe-inline' 'unsafe-eval'`
+
+Next.js / React requieren `unsafe-inline` para hidratación y `unsafe-eval`
+para ciertos patrones de renderizado dinámico. Esto debilita la protección
+contra XSS basado en inyección de scripts. Mitigación: la aplicación solo
+es accesible en localhost y requiere autenticación.
+
+### `connect-src 'self' http: https: ws: wss:`
+
+Permite que el JavaScript del frontend se conecte a cualquier URL. Esto
+es necesario porque la aplicación necesita comunicarse con:
+- La API local (puerto 5055)
+- Ollama en `host.docker.internal`
+- Potencialmente otros proveedores de IA configurados por el usuario
+
+Restringir esta directiva a URLs concretas rompería la funcionalidad para
+usuarios que configuran proveedores externos. Mitigación: la exposición
+solo existe si hay XSS activo, que requeriría eludir la autenticación y
+la restricción a localhost.
 
 ---
 
@@ -187,7 +265,7 @@ docker run --rm -v on-notebook-data:/data -v ${PWD}:/backup `
 ```powershell
 # Listar puertos publicados de cada contenedor:
 docker port on-surrealdb    # Debe estar VACÍO
-docker port on-app           # Debe mostrar 127.0.0.1:8502 y 127.0.0.1:5055
+docker port on-app           # Debe mostrar 127.0.0.1:8502 y 127.0.0.1:8502
 ```
 
 ---
@@ -196,7 +274,8 @@ docker port on-app           # Debe mostrar 127.0.0.1:8502 y 127.0.0.1:5055
 
 - [ ] He copiado `.env.hardened` como `.env`
 - [ ] He cambiado `OPEN_NOTEBOOK_ENCRYPTION_KEY` por un valor aleatorio
-- [ ] He cambiado `SURREAL_PASSWORD` por una contraseña fuerte
+- [ ] He cambiado `OPEN_NOTEBOOK_PASSWORD` por una contraseña fuerte
+- [ ] He cambiado `SURREAL_ROOT_PASSWORD` por una contraseña fuerte
 - [ ] He verificado que la imagen es v1.8.3 o superior
 - [ ] He ejecutado `docker compose up -d`
 - [ ] He verificado que `docker port on-surrealdb` está vacío

@@ -1,28 +1,21 @@
 # ============================================================================
-# OpenNotebook — Despliegue Local Endurecido
+# OpenNotebook Archival — Despliegue Windows Local Endurecido
 # ============================================================================
-# Diseñado para uso exclusivamente local (127.0.0.1) en equipos Windows
-# con Docker Desktop. Optimizado para el sector GLAM / archivístico.
+# Archivo utilizado por los scripts de deployment/windows/.
+# Lee la configuración de deployment/windows/runtime/settings.env
+# (generado automáticamente por 00-PRIMERA-INSTALACION.bat).
 #
 # Principios de seguridad aplicados:
 #   1. SurrealDB NO publica puertos al host (solo red interna Docker)
-#   2. Frontend y API solo escuchan en localhost (127.0.0.1)
-#   3. Credenciales de BD no triviales (definidas en .env)
-#   4. Imágenes fijadas a versión concreta (sin pull automático)
+#   2. Frontend y API solo escuchan en 127.0.0.1
+#   3. Credenciales generadas automáticamente (no triviales)
+#   4. Imagen fijada a versión concreta (sin pull automático)
 #   5. Contenedores sin privilegios elevados
 #   6. Red interna aislada para comunicación entre servicios
 #   7. Sin llamadas de actualización automática al exterior
 #   8. Volúmenes nombrados (más seguros que bind mounts en Windows)
 #   9. Restricciones de seguridad del kernel (no-new-privileges)
 #  10. Límites de recursos para prevenir denegación de servicio local
-#
-# USO:
-#   1. Copiar .env.hardened a .env y personalizar las contraseñas
-#   2. docker compose up -d
-#   3. Abrir http://127.0.0.1:8502
-#
-# IMPORTANTE: Verificar que se usa v1.8.3 o superior (parche CVE inyección
-# SurrealQL reportado por CERT-EU). Ver SECURITY_NOTES.md para detalles.
 # ============================================================================
 
 services:
@@ -60,14 +53,12 @@ services:
     networks:
       - on_internal
 
-    # Seguridad del contenedor
     security_opt:
       - no-new-privileges:true
     read_only: true
     tmpfs:
       - /tmp:size=64M
 
-    # Límites de recursos
     deploy:
       resources:
         limits:
@@ -76,15 +67,8 @@ services:
         reservations:
           memory: 256M
 
-    # Health check interno (no requiere puerto publicado)
     healthcheck:
       test: ["CMD-SHELL", "exit 0"]
-      # Nota: SurrealDB no ofrece un endpoint /health sencillo en CLI.
-      # Este healthcheck básico verifica que el proceso está vivo.
-      # Para un check más robusto, se puede usar:
-      #   test: ["CMD", "surreal", "sql", "--conn", "ws://localhost:8000",
-      #          "--user", "$$SURREAL_USER", "--pass", "$$SURREAL_PASSWORD",
-      #          "--ns", "test", "--db", "test", "-e", "SELECT 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -93,18 +77,15 @@ services:
   # --------------------------------------------------------------------------
   # APLICACIÓN — Open Notebook
   # --------------------------------------------------------------------------
-  # Frontend (8502) y API (5055) solo en 127.0.0.1.
+  # Frontend y API solo en 127.0.0.1.
   # --------------------------------------------------------------------------
   open_notebook:
     image: lfnovo/open_notebook:v1-latest
     container_name: on-app
 
     ports:
-      - "127.0.0.1:${FRONTEND_PORT:-8502}:8502"    # Web UI — solo localhost
-      - "127.0.0.1:${API_PORT:-5055}:5055"     # REST API — solo localhost
-
-    env_file:
-      - .env
+      - "127.0.0.1:${FRONTEND_PORT:-8502}:8502"
+      - "127.0.0.1:${API_PORT:-5055}:5055"
 
     environment:
       # Conexión a BD via red interna Docker (NO via host)
@@ -114,8 +95,28 @@ services:
       - SURREAL_NAMESPACE=${SURREAL_NAMESPACE}
       - SURREAL_DATABASE=${SURREAL_DATABASE}
 
-      # Desactivar llamadas salientes automáticas
-      - OPEN_NOTEBOOK_ENABLE_UPDATE_CHECK=false
+      # Autenticación y cifrado
+      - OPEN_NOTEBOOK_PASSWORD=${OPEN_NOTEBOOK_PASSWORD}
+      - OPEN_NOTEBOOK_ENCRYPTION_KEY=${OPEN_NOTEBOOK_ENCRYPTION_KEY}
+
+      # Conexión a Ollama (URL ya convertida a host.docker.internal por el instalador)
+      - OLLAMA_API_BASE=${OLLAMA_API_BASE}
+
+      # Endpoint compatible con OpenAI (opcional)
+      - OPENAI_COMPATIBLE_BASE_URL=${OPENAI_COMPATIBLE_BASE_URL:-}
+      - OPENAI_COMPATIBLE_API_KEY=${OPENAI_COMPATIBLE_API_KEY:-}
+
+      # Seguridad y configuración de la aplicación
+      - OPEN_NOTEBOOK_ALLOWED_ORIGINS=${OPEN_NOTEBOOK_ALLOWED_ORIGINS}
+      - OPEN_NOTEBOOK_PUBLIC_DOCS=${OPEN_NOTEBOOK_PUBLIC_DOCS:-false}
+      - OPEN_NOTEBOOK_ENABLE_UPDATE_CHECK=${OPEN_NOTEBOOK_ENABLE_UPDATE_CHECK:-false}
+      - OPEN_NOTEBOOK_TRUST_PROXY_HEADERS=${OPEN_NOTEBOOK_TRUST_PROXY_HEADERS:-false}
+      - OPEN_NOTEBOOK_AUTH_MAX_ATTEMPTS=${OPEN_NOTEBOOK_AUTH_MAX_ATTEMPTS:-10}
+      - OPEN_NOTEBOOK_AUTH_WINDOW_SECONDS=${OPEN_NOTEBOOK_AUTH_WINDOW_SECONDS:-300}
+      - OPEN_NOTEBOOK_AUTH_BLOCK_SECONDS=${OPEN_NOTEBOOK_AUTH_BLOCK_SECONDS:-600}
+      - OPEN_NOTEBOOK_AUTH_FAILURE_DELAY_MS=${OPEN_NOTEBOOK_AUTH_FAILURE_DELAY_MS:-400}
+      - OPEN_NOTEBOOK_MAX_UPLOAD_BYTES=${OPEN_NOTEBOOK_MAX_UPLOAD_BYTES:-52428800}
+      - OPEN_NOTEBOOK_ALLOW_PRIVATE_SOURCE_URLS=${OPEN_NOTEBOOK_ALLOW_PRIVATE_SOURCE_URLS:-false}
 
     volumes:
       - notebook_data:/app/data
@@ -130,11 +131,9 @@ services:
     networks:
       - on_internal
 
-    # Seguridad del contenedor
     security_opt:
       - no-new-privileges:true
 
-    # Límites de recursos
     deploy:
       resources:
         limits:
@@ -146,25 +145,15 @@ services:
 # ============================================================================
 # RED INTERNA
 # ============================================================================
-# Red bridge aislada. Los contenedores se comunican entre sí por nombre
-# de servicio (surrealdb:8000) sin necesidad de exponer puertos al host.
-# ============================================================================
 networks:
   on_internal:
     driver: bridge
     internal: false
-    # Nota: "internal: true" bloquearía TODO el tráfico saliente del stack,
-    # lo que impediría a Open Notebook conectarse a Ollama en el host
-    # (host.docker.internal) y descargar contenido web para procesar.
-    # Si se usa Ollama dentro del mismo compose, se puede poner true.
+    # internal: false permite a open_notebook alcanzar Ollama en
+    # host.docker.internal y descargar contenido web para procesar.
 
 # ============================================================================
 # VOLÚMENES NOMBRADOS
-# ============================================================================
-# Más seguros que bind mounts en Windows:
-#   - Docker gestiona permisos internamente
-#   - No exponen rutas del sistema de ficheros del host
-#   - Evitan el bug de Docker Desktop con bind mounts en unidades externas
 # ============================================================================
 volumes:
   surreal_data:
