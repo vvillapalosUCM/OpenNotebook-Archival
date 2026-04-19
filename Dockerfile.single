@@ -11,7 +11,9 @@
 # =============================================================================
 
 # Stage 1: Frontend Builder
-FROM node:20-slim AS frontend-builder
+# Pinned to bookworm-slim so glibc matches the Python runtime stage below,
+# which lets us copy the node binary into runtime cleanly.
+FROM node:20-bookworm-slim AS frontend-builder
 WORKDIR /app/frontend
 
 # Copy dependency files first to leverage cache
@@ -29,7 +31,8 @@ RUN npm run build
 FROM surrealdb/surrealdb:v2.1.4 AS surreal-binary
 
 # Stage 3: Backend Builder
-FROM python:3.12.13-slim-bookworm AS backend-builder  # pinned
+# pinned
+FROM python:3.12.13-slim-bookworm AS backend-builder
 # Install build dependencies
 RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends build-essential && rm -rf /var/lib/apt/lists/*
 # Install uv — pinned to specific version
@@ -51,14 +54,20 @@ RUN mkdir -p /app/tiktoken-cache && \
     .venv/bin/python -c "import tiktoken; tiktoken.get_encoding('o200k_base')"
 
 # Stage 4: Runtime
-FROM python:3.12.13-slim-bookworm AS runtime  # pinned
+# pinned
+FROM python:3.12.13-slim-bookworm AS runtime
 
-# Install runtime dependencies — Node.js via Debian packages (no curl|bash)
+# Install runtime dependencies. Node.js is NOT installed from apt because
+# Debian bookworm ships Node 18 and Next.js 16's server.js requires Node >= 20.
+# The Node 20 binary is copied from the frontend-builder stage below.
 RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     ffmpeg \
-    nodejs \
     supervisor \
     && rm -rf /var/lib/apt/lists/*
+
+# Node.js 20 runtime (binary copy from the frontend-builder image,
+# which is node:20-slim — same glibc family as the Python base here).
+COPY --from=frontend-builder /usr/local/bin/node /usr/local/bin/node
 
 # Install SurrealDB (copied from pinned v2.1.4 image)
 COPY --from=surreal-binary /surreal /usr/local/bin/surreal

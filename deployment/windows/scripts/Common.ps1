@@ -166,11 +166,22 @@ function Assert-Docker {
         throw "Docker Desktop no está instalado o no está en PATH."
     }
 
-    try {
-        docker version | Out-Null
-    } catch {
-        throw "Docker Desktop parece no estar iniciado. Ábralo y vuelva a intentarlo."
+    # Docker Desktop tarda unos segundos tras abrirse en aceptar conexiones
+    # por el named pipe. Reintentamos unas cuantas veces antes de rendirnos
+    # para que el instalador no falle si el usuario lo lanzó justo después
+    # de abrir Docker Desktop.
+    $maxAttempts = 10
+    for ($i = 1; $i -le $maxAttempts; $i++) {
+        # Capturamos stderr para que el error transitorio no se imprima en pantalla.
+        $null = & docker version 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            return
+        }
+        if ($i -lt $maxAttempts) {
+            Start-Sleep -Seconds 2
+        }
     }
+    throw "Docker Desktop parece no estar iniciado. Ábralo, espere a que termine de arrancar y vuelva a intentarlo."
 }
 
 function Assert-Git {
@@ -179,10 +190,15 @@ function Assert-Git {
     }
 }
 
-function Invoke-Compose([string[]]$Args) {
+function Invoke-Compose([string[]]$ComposeArgs) {
+    # IMPORTANT: no renombrar a $Args. $Args es una variable automática de
+    # PowerShell y, si se usa como nombre de parámetro, el splatting con
+    # @Args puede terminar expandiendo la variable automática (vacía) en
+    # lugar del parámetro, con lo que "docker compose" se invoca sin
+    # subcomando y solo imprime la ayuda.
     Push-Location $script:WindowsDir
     try {
-        & docker compose --env-file $script:EnvPath -f $script:ComposePath @Args
+        & docker compose --env-file $script:EnvPath -f $script:ComposePath @ComposeArgs
         if ($LASTEXITCODE -ne 0) {
             throw "docker compose exited with code $LASTEXITCODE"
         }
@@ -191,10 +207,11 @@ function Invoke-Compose([string[]]$Args) {
     }
 }
 
-function Invoke-ComposeCapture([string[]]$Args) {
+function Invoke-ComposeCapture([string[]]$ComposeArgs) {
+    # Ver nota en Invoke-Compose sobre $Args. Mismo motivo aquí.
     Push-Location $script:WindowsDir
     try {
-        $output = & docker compose --env-file $script:EnvPath -f $script:ComposePath @Args 2>&1
+        $output = & docker compose --env-file $script:EnvPath -f $script:ComposePath @ComposeArgs 2>&1
         # Filter out ErrorRecord objects (stderr) — keep only strings (stdout)
         $stdout = @($output | Where-Object { $_ -is [string] })
         return $stdout
