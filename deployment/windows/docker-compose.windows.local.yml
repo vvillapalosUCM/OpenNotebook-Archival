@@ -55,7 +55,8 @@ services:
 
     security_opt:
       - no-new-privileges:true
-    read_only: true
+    # Note: read_only is NOT used for SurrealDB because rocksdb needs to write
+    # WAL files, lock files, and internal state outside the data volume.
     tmpfs:
       - /tmp:size=64M
 

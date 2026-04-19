@@ -194,7 +194,10 @@ function Invoke-Compose([string[]]$Args) {
 function Invoke-ComposeCapture([string[]]$Args) {
     Push-Location $script:WindowsDir
     try {
-        return & docker compose --env-file $script:EnvPath -f $script:ComposePath @Args 2>&1
+        $output = & docker compose --env-file $script:EnvPath -f $script:ComposePath @Args 2>&1
+        # Filter out ErrorRecord objects (stderr) — keep only strings (stdout)
+        $stdout = @($output | Where-Object { $_ -is [string] })
+        return $stdout
     } finally {
         Pop-Location
     }

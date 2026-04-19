@@ -84,6 +84,15 @@ try {
     Write-Section "Construyendo y arrancando"
     Invoke-Compose @("up", "-d", "--build")
 
+    # Brief wait for containers to initialize, then show early status
+    Start-Sleep -Seconds 5
+    Write-Info "Estado inicial de contenedores:"
+    try {
+        Invoke-Compose @("ps")
+    } catch {
+        Write-Warn "No se ha podido consultar el estado de los contenedores."
+    }
+
     Write-Section "Esperando a que la aplicación quede lista"
     Wait-ForAppReady -Settings $settings
 
