@@ -84,6 +84,15 @@ class ContextBuilder:
         self.include_insights: bool = kwargs.get("include_insights", True)
         self.include_notes: bool = kwargs.get("include_notes", True)
         self.max_tokens: Optional[int] = kwargs.get("max_tokens")
+        # How much of a single-source context (self.source_id path) to include.
+        # Valid values: "insights" (default — short metadata + insights only,
+        # NO full document text), "full content insights" (full document +
+        # insights), "full content" (document text only), "not in" (skip).
+        # The "chat de la fuente" UI must request "full content insights"
+        # otherwise the model only sees the document title.
+        self.source_inclusion_level: str = kwargs.get(
+            "source_inclusion_level", "insights"
+        )
 
         # Context configuration
         context_config_arg: Optional[ContextConfig] = kwargs.get("context_config")
@@ -117,7 +126,9 @@ class ContextBuilder:
 
             # Build context based on parameters
             if self.source_id:
-                await self._add_source_context(self.source_id)
+                await self._add_source_context(
+                    self.source_id, inclusion_level=self.source_inclusion_level
+                )
 
             if self.notebook_id:
                 await self._add_notebook_context(self.notebook_id)

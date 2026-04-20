@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useEffect, useId } from 'react'
+import { useMemo, useState, useEffect, useId, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { AppShell } from '@/components/layout/AppShell'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
@@ -295,10 +295,23 @@ function DiscoverModelsDialog({
     (credential.modalities[0] as ModelType) || 'language'
   )
 
+  // Stable ref to the mutation and to credential.modalities so they don't
+  // appear as useEffect dependencies — React Query returns a new object
+  // reference on every render, which, combined with mutate() causing a
+  // rerender via setState, produces an infinite loop (React error #185:
+  // "Maximum update depth exceeded"). The original code listed
+  // [discoverModels, credential.modalities] in the dependency array and
+  // triggered a storm of POST /credentials/{id}/discover requests every
+  // time the dialog was opened.
+  const discoverModelsRef = useRef(discoverModels)
+  discoverModelsRef.current = discoverModels
+  const modalitiesRef = useRef(credential.modalities)
+  modalitiesRef.current = credential.modalities
+
   useEffect(() => {
     if (open && !hasDiscovered) {
       setDiscoveryError(null)
-      discoverModels.mutate(credential.id, {
+      discoverModelsRef.current.mutate(credential.id, {
         onSuccess: (result) => {
           const seen = new Set<string>()
           const unique = result.discovered.filter((m) => {
@@ -324,9 +337,12 @@ function DiscoverModelsDialog({
       setDiscoveryError(null)
       setSearchQuery('')
       setCustomModelSelected(false)
-      setSelectedType((credential.modalities[0] as ModelType) || 'language')
+      setSelectedType((modalitiesRef.current[0] as ModelType) || 'language')
     }
-  }, [open, hasDiscovered, credential.id, credential.modalities, discoverModels])
+    // Intentionally only depends on `open`, `hasDiscovered` and the credential
+    // identity. discoverModels and credential.modalities are accessed via refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, hasDiscovered, credential.id])
 
   useEffect(() => {
     setCustomModelSelected(false)

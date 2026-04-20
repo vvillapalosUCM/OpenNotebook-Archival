@@ -68,6 +68,15 @@ def _call_model_with_source_context_inner(
                 source_id=source_id,
                 include_insights=True,
                 include_notes=False,  # Focus on source-specific content
+                # Include the FULL document text, not just the title/metadata.
+                # The default "insights" level only includes ~title + insights
+                # and produces a context of ~36 tokens even for long documents,
+                # which is why the model could not answer questions about the
+                # document's actual contents. "full content insights" passes
+                # the extracted text to the LLM along with any insights.
+                # `max_tokens=50000` below still truncates extremely large
+                # documents so the prompt stays bounded.
+                source_inclusion_level="full content insights",
                 max_tokens=50000,  # Reasonable limit for source context
             )
             return new_loop.run_until_complete(context_builder.build())
