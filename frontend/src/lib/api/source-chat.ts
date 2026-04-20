@@ -50,7 +50,7 @@ export const sourceChatApi = {
     // Get auth token using the same logic as apiClient interceptor
     let token = null
     if (typeof window !== 'undefined') {
-      const authStorage = localStorage.getItem('auth-storage')
+      const authStorage = sessionStorage.getItem('auth-storage')
       if (authStorage) {
         try {
           const { state } = JSON.parse(authStorage)

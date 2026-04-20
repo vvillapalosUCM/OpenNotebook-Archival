@@ -109,6 +109,37 @@ async def check_database_health() -> dict:
 
 @router.get("/config")
 async def get_config(request: Request):
+    """
+    Public endpoint consumed by the frontend on initial load.
+
+    Only the minimum information the UI needs before authentication is
+    returned here: whether the database is reachable, and whether update
+    checks are enabled. Version and update-availability information are
+    intentionally NOT exposed on this endpoint because revealing the exact
+    backend version to unauthenticated clients helps attackers pick which
+    CVEs to try. Those fields are served by /config/version (below),
+    which IS protected by the password auth middleware.
+    """
+    db_health = await check_database_health()
+    db_status = db_health["status"]
+
+    if db_status == "offline":
+        logger.warning(f"Database offline: {db_health.get('error', 'Unknown error')}")
+
+    return {
+        "dbStatus": db_status,
+        "updateCheckEnabled": ENABLE_UPDATE_CHECK,
+    }
+
+
+@router.get("/config/version")
+async def get_config_version(request: Request):
+    """
+    Authenticated endpoint that returns version and update-availability
+    information. Protected by the global password-auth middleware because
+    the exact backend version is useful for attackers targeting known
+    vulnerabilities.
+    """
     current_version = get_version()
 
     latest_version = None
@@ -120,16 +151,9 @@ async def get_config(request: Request):
         except Exception as e:
             logger.error(f"Unexpected error during version check: {e}")
 
-    db_health = await check_database_health()
-    db_status = db_health["status"]
-
-    if db_status == "offline":
-        logger.warning(f"Database offline: {db_health.get('error', 'Unknown error')}")
-
     return {
         "version": current_version,
         "latestVersion": latest_version,
         "hasUpdate": has_update,
-        "dbStatus": db_status,
         "updateCheckEnabled": ENABLE_UPDATE_CHECK,
     }

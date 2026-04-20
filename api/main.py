@@ -222,6 +222,10 @@ app.add_middleware(
         "/openapi.json",
         "/redoc",
         "/api/auth/status",
+        # /api/config returns ONLY dbStatus + updateCheckEnabled so the
+        # frontend can render its initial shell before the user logs in.
+        # /api/config/version (protected) carries the version / update info.
+        "/api/config",
     ],
 )
 

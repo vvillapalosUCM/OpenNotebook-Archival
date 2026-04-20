@@ -29,6 +29,19 @@ services:
     image: surrealdb/surrealdb:v2.1.4
     container_name: on-surrealdb
 
+    # SurrealDB v2 image is distroless and runs as a non-root user by default.
+    # Docker named volumes are created owned by root, so the default user
+    # cannot create the RocksDB directory under /mydata and the process
+    # crashes with "Permission denied" (see docs.surrealdb.com Docker guide,
+    # which uses --user 0 / --user $(id -u) for the same reason).
+    # Running as root is acceptable here because:
+    #   - the container is only reachable inside the on_internal Docker
+    #     network (no ports published to host),
+    #   - privilege escalation is blocked via security_opt no-new-privileges,
+    #   - the application container (on-app) continues to run as the
+    #     non-root "notebook" user.
+    user: root
+
     command: >-
       start
       --log warn
@@ -55,6 +68,15 @@ services:
 
     security_opt:
       - no-new-privileges:true
+    # Descarta TODAS las capabilities del kernel. Aunque el proceso corra
+    # como root (ver bloque "user: root" arriba — es necesario para que
+    # RocksDB pueda crear su directorio en el volumen nombrado), root sin
+    # capabilities no puede manipular redes, dispositivos, ni saltarse
+    # permisos de ficheros. SurrealDB no necesita ninguna capability para
+    # funcionar: escucha en un puerto >1024 (8000) y solo lee/escribe en
+    # /mydata y /tmp.
+    cap_drop:
+      - ALL
     # Note: read_only is NOT used for SurrealDB because rocksdb needs to write
     # WAL files, lock files, and internal state outside the data volume.
     tmpfs:
@@ -65,15 +87,22 @@ services:
         limits:
           memory: 1G
           cpus: "1.0"
+          # Límite de procesos para prevenir fork bombs locales.
+          pids: 256
         reservations:
           memory: 256M
 
     healthcheck:
-      test: ["CMD-SHELL", "exit 0"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 15s
+      # IMPORTANTE: La imagen oficial de SurrealDB es distroless (no tiene
+      # /bin/sh), por lo que "CMD-SHELL" falla silenciosamente y el
+      # contenedor se queda marcado como "unhealthy" indefinidamente.
+      # Usamos el comando nativo "surreal isready" con la forma "CMD"
+      # (exec, sin shell), que es la documentada oficialmente.
+      test: ["CMD", "/surreal", "isready", "--endpoint", "http://localhost:8000"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   # --------------------------------------------------------------------------
   # APLICACIÓN — Open Notebook
@@ -137,12 +166,23 @@ services:
 
     security_opt:
       - no-new-privileges:true
+    # Descarta todas las capabilities. Este contenedor corre como el
+    # usuario no-root "notebook" (ver Dockerfile) y no necesita ninguna
+    # capability: la API escucha en 5055 y el frontend en 8502 (ambos
+    # puertos >1024), y solo lee/escribe en /app/data, /app/.cache,
+    # /var/log/supervisor y /tmp.
+    cap_drop:
+      - ALL
 
     deploy:
       resources:
         limits:
           memory: 2G
           cpus: "2.0"
+          # Límite de procesos para prevenir fork bombs.
+          # El contenedor corre supervisord + 3 procesos hijos
+          # (api uvicorn, worker, frontend node), más algunos threads Python.
+          pids: 512
         reservations:
           memory: 512M
 

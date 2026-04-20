@@ -24,7 +24,13 @@ apiClient.interceptors.request.use(async (config) => {
   }
 
   if (typeof window !== 'undefined') {
-    const authStorage = localStorage.getItem('auth-storage')
+    // NOTE: auth-store.ts persists its state to sessionStorage (see
+    // createJSONStorage(() => sessionStorage) in that file). This interceptor
+    // MUST read from the same storage bucket, otherwise the token is never
+    // attached to outgoing requests, the backend returns 401, and the
+    // response interceptor below forces the user back to /login — looking
+    // exactly like the login "succeeded then logged me out a second later".
+    const authStorage = sessionStorage.getItem('auth-storage')
     if (authStorage) {
       try {
         const { state } = JSON.parse(authStorage)
@@ -53,9 +59,10 @@ apiClient.interceptors.response.use(
   (response: AxiosResponse) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Clear auth and redirect to login
+      // Clear auth and redirect to login. Must match the storage used by
+      // auth-store.ts (sessionStorage), otherwise a stale token survives.
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('auth-storage')
+        sessionStorage.removeItem('auth-storage')
         window.location.href = '/login'
       }
     }

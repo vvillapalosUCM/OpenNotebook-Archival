@@ -164,7 +164,7 @@ export function EpisodeCard({ episode, onDelete, deleting, onRetry, retrying }: 
       try {
         let token: string | undefined
         if (typeof window !== 'undefined') {
-          const raw = window.localStorage.getItem('auth-storage')
+          const raw = window.sessionStorage.getItem('auth-storage')
           if (raw) {
             try {
               const parsed = JSON.parse(raw)

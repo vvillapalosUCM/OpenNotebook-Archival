@@ -76,8 +76,12 @@ RUN mkdir -p /app/tiktoken-cache && \
 # pinned — update periodically
 FROM python:3.12.13-slim-bookworm AS runtime
 
-# Runtime system dependencies (no Node from apt — see note above)
+# Runtime system dependencies (no Node from apt — see note above).
+# curl is required by /app/scripts/wait-for-api.sh, which the supervisord
+# config runs before starting the Next.js frontend — without it the script
+# silently fails every health probe and delays frontend startup by 5 min.
 RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
+    curl \
     ffmpeg \
     supervisor \
     && rm -rf /var/lib/apt/lists/*
@@ -102,6 +106,10 @@ COPY --from=builder /app/tiktoken-cache /app/tiktoken-cache
 # Ensure uv uses the existing venv without attempting network operations
 ENV UV_NO_SYNC=1
 ENV VIRTUAL_ENV=/app/.venv
+# Point uv's cache at a directory writable by the non-root "notebook" user.
+# Without this, `uv run` tries to create $HOME/.cache/uv (i.e. /app/.cache/uv)
+# but /app is owned by root and the process crashes with "Permission denied".
+ENV UV_CACHE_DIR=/tmp/uv-cache
 # Point the app at the pre-baked tiktoken encoding (see open_notebook/config.py)
 ENV TIKTOKEN_CACHE_DIR=/app/tiktoken-cache
 
@@ -125,10 +133,13 @@ RUN sed -i 's/\r$//' /app/scripts/wait-for-api.sh && chmod +x /app/scripts/wait-
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Create runtime directories and a non-root user
-RUN mkdir -p /app/data /var/log/supervisor /tmp \
+# /app/.cache is created and owned by notebook so any tool that falls back to
+# $HOME/.cache (notebook's home is /app) has a writable location. uv itself
+# is redirected via UV_CACHE_DIR=/tmp/uv-cache above.
+RUN mkdir -p /app/data /app/.cache /var/log/supervisor /tmp \
     && groupadd --system notebook \
     && useradd --system --gid notebook --home-dir /app --shell /usr/sbin/nologin notebook \
-    && chown -R notebook:notebook /app/data /var/log/supervisor /tmp
+    && chown -R notebook:notebook /app/data /app/.cache /var/log/supervisor /tmp
 
 # Runtime API URL configuration
 # The API_URL environment variable can be set at container runtime to configure
