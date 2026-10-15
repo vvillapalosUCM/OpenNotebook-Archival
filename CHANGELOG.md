@@ -70,6 +70,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Docker packaging privacy** — both Dockerfiles now copy explicit runtime
+  inputs, and `.dockerignore` admits only application/build inputs. Windows
+  installer credentials, diagnostics, backups and local environment files
+  are excluded before the build context reaches Docker. A Docker-based CI
+  regression check uses synthetic private files and verifies that required
+  application resources remain available. Existing images/caches are unchanged.
 - **Windows installer** — `$Args` parameter name in `Common.ps1` was
   shadowing the PowerShell automatic variable `$Args`, causing the
   splatting in `Invoke-Compose` to expand to an empty list and run
