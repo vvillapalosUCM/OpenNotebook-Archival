@@ -146,6 +146,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Pillow forced to >= 13.0.0** through `[tool.uv] override-dependencies`.
+  The locked Pillow 11.3.0 carries 4 critical and 35 high advisories, and
+  Dependabot could not upgrade it because moviepy 2.2.1 (pulled in by
+  content-core and podcast-creator) declares `pillow<12`. That cap exists
+  only for `TextClip`, which neither dependency uses; `AudioFileClip` and
+  `concatenate_audioclips` were tested under Pillow 13. Drop the override
+  once moviepy releases a version without the cap.
+- **Development images published to the fork's own registry.**
+  `build-dev.yml` and the `Makefile` still targeted upstream's
+  `ghcr.io/lfnovo/open-notebook` and `lfnovo/open_notebook`, so publishing
+  failed with `permission_denied`. They now use
+  `ghcr.io/vvillapalosucm/opennotebook-archival`, like `build-and-release.yml`.
 - **Authentication bypass via poisoned `Host` header** (CVE-2026-48710,
   GHSA-86qp-5c8j-p5mr). `PasswordAuthMiddleware` decided public paths
   with `request.url.path`, which Starlette < 1.0.1 rebuilds from the
