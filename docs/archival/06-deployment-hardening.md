@@ -10,7 +10,8 @@ Este fork debe desplegarse como aplicación local o de red privada controlada. N
 2. Configurar `OPEN_NOTEBOOK_PASSWORD` y `OPEN_NOTEBOOK_ENCRYPTION_KEY` con valores robustos.
 3. Mantener `OPEN_NOTEBOOK_PUBLIC_DOCS=false` salvo necesidad operativa temporal.
 4. Limitar `OPEN_NOTEBOOK_ALLOWED_ORIGINS` a las URLs reales del frontend.
-5. Mantener `OPEN_NOTEBOOK_ALLOW_PRIVATE_SOURCE_URLS=false` en despliegues normales.
+5. Mantener `OPEN_NOTEBOOK_ALLOW_PRIVATE_SOURCE_URLS=false` en despliegues normales. Así se bloquea cualquier descarga de fuentes que acabe en una dirección no pública, aunque llegue por redirección o por cambio de DNS.
+5b. Mantener `OPEN_NOTEBOOK_URL_ENGINE=simple` para que las URLs de las fuentes no se envíen a servicios de extracción externos.
 6. Mantener `OPEN_NOTEBOOK_ENABLE_UPDATE_CHECK=false` en entornos institucionales cerrados.
 7. Confiar en cabeceras de proxy solo si el despliegue está detrás de un proxy controlado y se activa `OPEN_NOTEBOOK_TRUST_PROXY_HEADERS=true`.
 8. Fijar un límite de subida razonable con `OPEN_NOTEBOOK_MAX_UPLOAD_BYTES`.

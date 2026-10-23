@@ -1,4 +1,5 @@
 import operator
+import os
 from typing import Any, Dict, List, Optional
 
 from content_core import extract_content
@@ -14,6 +15,23 @@ from open_notebook.domain.content_settings import ContentSettings
 from open_notebook.domain.notebook import Asset, Source
 from open_notebook.domain.transformation import Transformation
 from open_notebook.graphs.transformation import graph as transform_graph
+from open_notebook.utils.ssrf_guard import install_source_fetch_guard
+
+# Every content-core download (first request and each redirect hop) is checked
+# against the address it actually connects to. Installed at import so both the
+# API process and the surreal-commands worker are covered.
+install_source_fetch_guard()
+
+# URL extraction engine. "simple" downloads the page locally. content-core's
+# "auto" sends every URL to r.jina.ai (or Firecrawl) first, which leaks what is
+# being consulted to a third party; it stays available as an explicit opt-in.
+_ALLOWED_URL_ENGINES = {"simple", "auto", "jina", "firecrawl"}
+URL_ENGINE = os.environ.get("OPEN_NOTEBOOK_URL_ENGINE", "simple").strip().lower()
+if URL_ENGINE not in _ALLOWED_URL_ENGINES:
+    logger.warning(
+        "Unknown OPEN_NOTEBOOK_URL_ENGINE {!r}; falling back to 'simple'", URL_ENGINE
+    )
+    URL_ENGINE = "simple"
 
 
 class SourceState(TypedDict):
@@ -34,7 +52,7 @@ class TransformationState(TypedDict):
 async def content_process(state: SourceState) -> dict:
     content_settings = ContentSettings(
         default_content_processing_engine_doc="auto",
-        default_content_processing_engine_url="auto",
+        default_content_processing_engine_url=URL_ENGINE,
         default_embedding_option="ask",
         auto_delete_files="yes",
         youtube_preferred_languages=[
