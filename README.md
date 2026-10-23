@@ -111,7 +111,8 @@ El instalador:
 - `OPEN_NOTEBOOK_ALLOWED_ORIGINS`: lista CSV de orígenes permitidos para CORS.
 - `OPEN_NOTEBOOK_PUBLIC_DOCS`: `true` o `false` para exponer Swagger/ReDoc.
 - `OPEN_NOTEBOOK_ENABLE_UPDATE_CHECK`: activa o desactiva la comprobación de actualizaciones.
-- `OPEN_NOTEBOOK_ALLOW_PRIVATE_SOURCE_URLS`: controla si se permiten URLs privadas en fuentes.
+- `OPEN_NOTEBOOK_ALLOW_PRIVATE_SOURCE_URLS`: controla si se permiten URLs privadas en fuentes. Con `false` (por defecto) se comprueba también la IP real de cada conexión, incluidas las redirecciones.
+- `OPEN_NOTEBOOK_URL_ENGINE`: motor de extracción de URLs. `simple` (por defecto) descarga la página en local; `auto`, `jina` o `firecrawl` envían la URL a un servicio externo.
 - `OPEN_NOTEBOOK_ALLOW_NO_PASSWORD`: solo para desarrollo local consciente; no recomendado.
 
 ### Base de datos

@@ -1,0 +1,87 @@
+# =============================================================================
+# Dependabot — OpenNotebook-Archival
+# -----------------------------------------------------------------------------
+# The fork pins every dependency through uv.lock (backend) and
+# frontend/package-lock.json (frontend). Dependabot regenerates those lockfiles
+# with verified hashes and opens one PR per update, so security fixes for
+# FastAPI/Starlette, Next.js, Pillow, etc. arrive as reviewable PRs.
+#
+# Security updates also require "Dependabot alerts" and "Dependabot security
+# updates" to be enabled in Settings → Code security of this repository.
+# =============================================================================
+
+version: 2
+
+updates:
+  # --- Python backend (pyproject.toml + uv.lock) ---
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "07:00"
+      timezone: "Europe/Madrid"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencias"
+      - "python"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    groups:
+      python-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+
+  # --- Next.js frontend (frontend/package.json + package-lock.json) ---
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "07:00"
+      timezone: "Europe/Madrid"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencias"
+      - "frontend"
+    commit-message:
+      prefix: "deps(frontend)"
+    groups:
+      npm-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+
+  # --- Base images (Dockerfile, Dockerfile.single) ---
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "07:00"
+      timezone: "Europe/Madrid"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencias"
+      - "docker"
+    commit-message:
+      prefix: "deps(docker)"
+
+  # --- GitHub Actions used by the workflows ---
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "07:00"
+      timezone: "Europe/Madrid"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencias"
+      - "ci"
+    commit-message:
+      prefix: "deps(ci)"

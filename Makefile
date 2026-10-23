@@ -6,8 +6,9 @@
 VERSION := $(shell grep -m1 version pyproject.toml | cut -d'"' -f2)
 
 # Image names for both registries
-DOCKERHUB_IMAGE := lfnovo/open_notebook
-GHCR_IMAGE := ghcr.io/lfnovo/open-notebook
+# Registro propio del fork (como en .github/workflows/build-*.yml).
+DOCKERHUB_IMAGE := vvillapalosucm/opennotebook-archival
+GHCR_IMAGE := ghcr.io/vvillapalosucm/opennotebook-archival
 
 # Build platforms
 PLATFORMS := linux/amd64,linux/arm64

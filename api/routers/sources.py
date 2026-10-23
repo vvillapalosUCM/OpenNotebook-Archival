@@ -37,6 +37,7 @@ from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.domain.notebook import Asset, Notebook, Source
 from open_notebook.domain.transformation import Transformation
 from open_notebook.exceptions import InvalidInputError
+from open_notebook.utils.ssrf_guard import is_blocked_ip
 
 router = APIRouter()
 
@@ -75,15 +76,12 @@ def generate_unique_filename(original_filename: str, upload_folder: str) -> str:
 
 
 def _is_private_or_local_ip(ip_str: str) -> bool:
-    ip = ipaddress.ip_address(ip_str)
-    return (
-        ip.is_private
-        or ip.is_loopback
-        or ip.is_link_local
-        or ip.is_reserved
-        or ip.is_multicast
-        or ip.is_unspecified
-    )
+    # Same rule as the connect-time guard (open_notebook/utils/ssrf_guard.py):
+    # anything that is not a globally routable address, including CGNAT and
+    # IPv4-mapped IPv6 forms. This pre-check gives the user a clear error; the
+    # guard is what actually stops redirects and DNS rebinding.
+    ipaddress.ip_address(ip_str.split("%", 1)[0])  # ValueError for non-IPs, as before
+    return is_blocked_ip(ip_str)
 
 
 def validate_source_url(url: str) -> None:

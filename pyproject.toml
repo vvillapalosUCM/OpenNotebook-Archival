@@ -70,6 +70,17 @@ dev = [
     "types-requests>=2.32.4.20250913",
 ]
 
+[tool.uv]
+# Seguridad: Pillow 11.3.0 tiene 4 avisos críticos y 35 altos (desbordamientos
+# de heap en TIFF/JPEG/FreeType, inyección de argumentos en Ghostscript).
+# moviepy 2.2.1 (dependencia de content-core y podcast-creator) declara
+# pillow<12 solo porque TextClip usa ImageDraw._multiline_spacing, eliminado
+# en Pillow 12; su rama principal ya quita el tope, pero aún no hay release.
+# Ni content-core ni podcast-creator usan TextClip: solo AudioFileClip y
+# concatenate_audioclips, que funcionan con Pillow 13 (probado). Quitar este
+# override cuando moviepy publique una versión sin el tope.
+override-dependencies = ["pillow>=13.0.0"]
+
 [tool.isort]
 profile = "black"
 line_length = 88
