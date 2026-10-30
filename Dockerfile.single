@@ -81,9 +81,15 @@ COPY --from=ghcr.io/astral-sh/uv:0.11.6 /uv /uvx /bin/
 
 WORKDIR /app
 
-# Copy backend virtualenv and source code
+# Copy backend virtualenv and only runtime inputs, never the whole checkout.
+# .dockerignore also keeps local secrets out of every build stage/context.
 COPY --from=backend-builder /app/.venv /app/.venv
-COPY . /app/
+COPY pyproject.toml uv.lock .python-version README.md LICENSE run_api.py /app/
+COPY api/ /app/api/
+COPY commands/ /app/commands/
+COPY open_notebook/ /app/open_notebook/
+COPY prompts/ /app/prompts/
+COPY configs/archival/seed_transformations.json /app/configs/archival/seed_transformations.json
 
 # Copy pre-downloaded tiktoken encoding from builder (outside /data/ — volume-mount safe)
 COPY --from=backend-builder /app/tiktoken-cache /app/tiktoken-cache
