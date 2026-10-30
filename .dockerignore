@@ -1,52 +1,86 @@
-# Git
-.git
-.gitignore
+# Only application/build inputs enter Docker's context. In particular,
+# deployment/windows/runtime (settings.env, diagnostics), backups, Git history
+# and arbitrary files placed at the repository root must stay on the host.
+# Keep this list in sync with BOTH Dockerfiles and the packaging regression test.
+**
+!pyproject.toml
+!uv.lock
+!.python-version
+!README.md
+!LICENSE
+!run_api.py
+!api/
+!api/**
+!commands/
+!commands/**
+!open_notebook/
+!open_notebook/**
+!prompts/
+!prompts/**
+!configs/
+!configs/archival/
+!configs/archival/seed_transformations.json
+!frontend/
+!frontend/**
+!scripts/
+!scripts/wait-for-api.sh
+!supervisord.conf
+!supervisord.single.conf
 
-# Python
-__pycache__
-*.pyc
-*.pyo
-*.pyd
-.venv
-venv
-ENV
-env
-.pytest_cache
-.mypy_cache
-.ruff_cache
+# Local configuration and artifacts are excluded even INSIDE an allowed tree.
+# These rules deliberately follow all inclusions. Supply secrets at runtime.
+**/.env
+**/.env.*
+**/*.env
+**/*.env.*
+**/*.pem
+**/*.key
+**/.npmrc
+**/.pypirc
+**/.netrc
+**/.ssh
+**/.aws
+**/runtime
+**/backups
+**/diagnostico*.txt
+**/*.log
+**/*.db
+**/*.sqlite
+**/*.sqlite3
+**/data
+**/mydata
+**/notebook_data
+**/surreal_data
+**/surreal-data
+**/surreal_single_data
+**/tmp
 
-# Frontend
-frontend/node_modules
-frontend/.next
-frontend/dist
-frontend/out
-frontend/.env*
-frontend/*.log
-
-# Project data
-.antigravity
-.gemini
-tmp
-data
-mydata
-notebook_data
-surreal_data
-surreal-data
-surreal_single_data
-*.db
-*.log
-docker.env
-.env
-docker-compose*
-
-# Documentation & CI (not needed in image)
-docs
-.github
-
-# IDE and OS files
-.vscode
-.idea
-*.swp
-*.swo
-*~
-.DS_Store
+# Build products, dependencies and development tooling are rebuilt in Docker.
+**/node_modules
+**/.next
+**/dist
+**/out
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/*.egg-info
+**/.venv
+**/venv
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/.git
+**/.gitignore
+**/.antigravity
+**/.gemini
+**/.claude
+**/.codex
+**/CLAUDE.md
+**/AGENTS.md
+**/.vscode
+**/.idea
+**/*.swp
+**/*.swo
+**/*~
+**/.DS_Store
