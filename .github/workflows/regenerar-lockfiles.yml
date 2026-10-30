@@ -1,0 +1,59 @@
+# Workflow TEMPORAL: solo existe en la rama seguridad/lockfiles-2026-10.
+# Regenera uv.lock y frontend/package-lock.json para cerrar alertas de
+# Dependabot que no se pueden resolver sin acceso a PyPI/npm, y se borra a
+# sí mismo en el mismo commit. No llega nunca a main.
+name: Regenerar lockfiles (temporal)
+
+on:
+  push:
+    branches: [seguridad/lockfiles-2026-10]
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: seguridad/lockfiles-2026-10
+
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+
+      - name: Python - subir paquetes con alertas
+        run: |
+          uv lock \
+            --upgrade-package anyio \
+            --upgrade-package soupsieve \
+            --upgrade-package pyasn1 \
+            --upgrade-package httpx2 \
+            --upgrade-package httpcore2
+          for p in anyio soupsieve pyasn1 httpx2 httpcore2; do
+            v=$(awk -v n="$p" '$0=="name = \""n"\"" {getline; print; exit}' uv.lock)
+            echo "::notice title=uv.lock ${p}::${v}"
+          done
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - name: npm - corregir dentro de los rangos de package.json
+        working-directory: frontend
+        run: |
+          npm audit fix || true
+          for p in axios vitest @vitest/ui tinypool form-data source-map-js ws browserslist js-yaml; do
+            v=$(node -e "const l=require('./package-lock.json').packages;const k=Object.keys(l).filter(k=>k.endsWith('node_modules/'+process.argv[1]));console.log([...new Set(k.map(x=>l[x].version))].join(','))" "$p")
+            echo "::notice title=package-lock ${p}::${v}"
+          done
+          echo "::notice title=npm audit (prod)::$(npm audit --omit=dev --json | jq -c '.metadata.vulnerabilities')"
+          echo "::notice title=npm audit (todo)::$(npm audit --json | jq -c '.metadata.vulnerabilities')"
+
+      - name: Commit de los lockfiles y retirada de este workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm -q .github/workflows/regenerar-lockfiles.yml
+          git add uv.lock frontend/package.json frontend/package-lock.json
+          git commit -m "deps: regenerar uv.lock y package-lock.json para cerrar alertas de seguridad"
+          git push origin HEAD:seguridad/lockfiles-2026-10
