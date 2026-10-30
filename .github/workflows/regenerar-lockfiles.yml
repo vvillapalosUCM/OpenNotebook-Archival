@@ -59,7 +59,7 @@ jobs:
       - name: Commit 2 - vitest 5 (corrige vitest y tinypool)
         working-directory: frontend
         run: |
-          if npm install --save-dev vitest@^5.0.5 @vitest/ui@^5.0.5; then
+          if npm install --save-dev vitest@^5.0.5 @vitest/ui@^5.0.5 > vitest5.log 2>&1; then
             for p in vitest @vitest/ui tinypool; do
               v=$(node -e "const l=require('./package-lock.json').packages;const k=Object.keys(l).filter(k=>k.endsWith('node_modules/'+process.argv[1]));console.log([...new Set(k.map(x=>l[x].version))].join(','))" "$p")
               echo "::notice title=vitest5 ${p}::${v}"
@@ -69,8 +69,16 @@ jobs:
             git commit -m "deps(dev): vitest y @vitest/ui 3 -> 5 (alertas criticas de vitest y tinypool)"
           else
             git checkout -- package.json package-lock.json
-            echo "::warning title=vitest5::npm install de vitest 5 ha fallado; se deja vitest 3"
+            echo "::warning title=vitest5::$(grep -E 'ERESOLVE|peer|Could not resolve|conflicting' vitest5.log | head -6 | tr '\n' ' ' | tail -c 700)"
           fi
 
       - name: Push
-        run: git push origin HEAD:seguridad/lockfiles-2026-10
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git log --oneline -4
+          if ! git push origin HEAD:seguridad/lockfiles-2026-10 > push.log 2>&1; then
+            echo "::error title=push::$(tr '\n' ' ' < push.log | tail -c 600)"
+            echo "::error title=token::$(curl -sS -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/${GITHUB_REPOSITORY} | jq -c '.permissions')"
+            exit 1
+          fi
