@@ -97,8 +97,14 @@ WORKDIR /app
 # Copy the Python virtual environment from the backend builder stage
 COPY --from=builder /app/.venv /app/.venv
 
-# Copy the source code
-COPY . /app
+# Copy only runtime inputs; never copy the local checkout wholesale.
+# .dockerignore also keeps local secrets out of every build stage/context.
+COPY pyproject.toml uv.lock .python-version README.md LICENSE run_api.py /app/
+COPY api/ /app/api/
+COPY commands/ /app/commands/
+COPY open_notebook/ /app/open_notebook/
+COPY prompts/ /app/prompts/
+COPY configs/archival/seed_transformations.json /app/configs/archival/seed_transformations.json
 
 # Copy pre-downloaded tiktoken encoding from builder (outside /app/data — volume-mount safe)
 COPY --from=builder /app/tiktoken-cache /app/tiktoken-cache
