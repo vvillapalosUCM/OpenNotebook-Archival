@@ -70,6 +70,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Docker packaging privacy** — both Dockerfiles now copy explicit runtime
+  inputs, and `.dockerignore` admits only application/build inputs. Windows
+  installer credentials, diagnostics, backups and local environment files
+  are excluded before the build context reaches Docker. A Docker-based CI
+  regression check uses synthetic private files and verifies that required
+  application resources remain available. Existing images/caches are unchanged.
 - **Frontend tests** — the `Tests` workflow failed on `main` for two
   reasons, both fixed: 17 i18n keys left without references after the
   podcast-list, Vertex AI and connection-error-detail removals were deleted

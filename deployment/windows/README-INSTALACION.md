@@ -30,3 +30,22 @@ Antes de empezar, deben estar instalados:
 - construye una imagen local del fork
 - arranca los contenedores
 - abre la aplicación en el navegador
+
+## Configuración privada y empaquetado
+
+La configuración `runtime/settings.env`, los diagnósticos de `runtime/` y las
+copias de `backups/` permanecen en el equipo: no forman parte del contexto de
+construcción ni de las nuevas imágenes Docker. Los dos Dockerfiles copian
+únicamente los componentes necesarios para ejecutar la aplicación. Las
+credenciales se siguen suministrando al arrancar mediante Docker Compose.
+
+Para aplicar esta corrección a una instalación existente, actualice el código
+y utilice `03-ACTUALIZAR.bat`, que reconstruye la imagen. Conserve `settings.env`
+y los volúmenes de datos: no es necesario reinstalar ni cambiar contraseñas
+para reconstruir. La corrección no elimina imágenes, cachés ni archivos
+exportados anteriormente; no comparta una imagen antigua que pudiera contener
+su configuración. Si ya la compartió, cambie las credenciales que incluía.
+
+La prueba `python tests/docker-packaging.py` requiere Docker en ejecución y
+comprueba ambos Dockerfiles con archivos ficticios, sin leer la configuración
+personal ni iniciar los servicios de la aplicación. También se ejecuta en CI.
