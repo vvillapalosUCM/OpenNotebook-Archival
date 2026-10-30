@@ -1,6 +1,7 @@
 import asyncio
 import hmac
 import os
+import re
 import time
 from typing import Optional
 
@@ -28,6 +29,32 @@ def _env_bool(name: str, default: bool = False) -> bool:
     if not raw:
         return default
     return raw in {"1", "true", "yes", "on"}
+
+
+# A Host header is "hostname[:port]" or "[ipv6][:port]". Anything else ("/",
+# "?", "#", "@", spaces...) is malformed. Older Starlette versions rebuild
+# request.url from Host, so a value like "localhost:5055/docs?" poisoned
+# request.url.path (CVE-2026-48710 / GHSA-86qp-5c8j-p5mr) and let any request
+# match a public path. Such headers are rejected outright.
+_HOST_HEADER_RE = re.compile(
+    r"^(?:[A-Za-z0-9_](?:[A-Za-z0-9_.\-]*[A-Za-z0-9_])?|\[[0-9A-Fa-f:.]+\])(?::[0-9]{1,5})?$"
+)
+
+
+def host_header_is_valid(host: Optional[str]) -> bool:
+    """True when the Host header is absent or a well-formed host[:port]."""
+    if host is None:
+        return True
+    return bool(_HOST_HEADER_RE.fullmatch(host.strip()))
+
+
+def request_path(request: Request) -> str:
+    """Real ASGI path of the request.
+
+    Never use request.url.path for security decisions: it is rebuilt from the
+    client-controlled Host header. scope["path"] is what the router dispatches on.
+    """
+    return request.scope.get("path", "")
 
 
 class PasswordAuthMiddleware(BaseHTTPMiddleware):
@@ -89,13 +116,19 @@ class PasswordAuthMiddleware(BaseHTTPMiddleware):
             self.blocked_until[client_ip] = now + self.block_seconds
 
     async def dispatch(self, request: Request, call_next):
+        if not host_header_is_valid(request.headers.get("host")):
+            return JSONResponse(
+                status_code=400,
+                content={"detail": "Invalid Host header"},
+            )
+
         if not self.password:
             # This path is only reachable if OPEN_NOTEBOOK_ALLOW_NO_PASSWORD=true
             # was set explicitly. The lifespan check in main.py blocks startup
             # without a password by default.
             return await call_next(request)
 
-        if request.url.path in self.excluded_paths:
+        if request_path(request) in self.excluded_paths:
             return await call_next(request)
 
         if request.method == "OPTIONS":

@@ -27,8 +27,11 @@ permissions:
   packages: write
 
 env:
-  GHCR_IMAGE: ghcr.io/lfnovo/open-notebook
-  DOCKERHUB_IMAGE: lfnovo/open_notebook
+  # Registro propio del fork (mismo nombre que build-and-release.yml). Los
+  # valores heredados de upstream (lfnovo/...) hacían fallar la publicación:
+  # el fork no tiene permiso en el registro del proyecto original.
+  GHCR_IMAGE: ghcr.io/vvillapalosucm/opennotebook-archival
+  DOCKERHUB_IMAGE: vvillapalosucm/opennotebook-archival
 
 jobs:
   extract-version:

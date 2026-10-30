@@ -76,6 +76,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   are excluded before the build context reaches Docker. A Docker-based CI
   regression check uses synthetic private files and verifies that required
   application resources remain available. Existing images/caches are unchanged.
+- **Frontend tests** — the `Tests` workflow failed on `main` for two
+  reasons, both fixed: 17 i18n keys left without references after the
+  podcast-list, Vertex AI and connection-error-detail removals were deleted
+  from every locale (key parity across the 10 locales is preserved), and
+  `AppSidebar.test.tsx` now looks for the fork's brand name (*Open ArchiBook
+  LLM*) instead of *Open Notebook*. The collapsed sidebar logo also takes its
+  `alt` text from `common.appName` instead of the upstream name.
 - **Windows installer** — `$Args` parameter name in `Common.ps1` was
   shadowing the PowerShell automatic variable `$Args`, causing the
   splatting in `Invoke-Compose` to expand to an empty list and run
@@ -152,6 +159,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Pillow forced to >= 13.0.0** through `[tool.uv] override-dependencies`.
+  The locked Pillow 11.3.0 carries 4 critical and 35 high advisories, and
+  Dependabot could not upgrade it because moviepy 2.2.1 (pulled in by
+  content-core and podcast-creator) declares `pillow<12`. That cap exists
+  only for `TextClip`, which neither dependency uses; `AudioFileClip` and
+  `concatenate_audioclips` were tested under Pillow 13. Drop the override
+  once moviepy releases a version without the cap.
+- **Development images published to the fork's own registry.**
+  `build-dev.yml` and the `Makefile` still targeted upstream's
+  `ghcr.io/lfnovo/open-notebook` and `lfnovo/open_notebook`, so publishing
+  failed with `permission_denied`. They now use
+  `ghcr.io/vvillapalosucm/opennotebook-archival`, like `build-and-release.yml`.
+- **Authentication bypass via poisoned `Host` header** (CVE-2026-48710,
+  GHSA-86qp-5c8j-p5mr). `PasswordAuthMiddleware` decided public paths
+  with `request.url.path`, which Starlette < 1.0.1 rebuilds from the
+  `Host` header: `Host: localhost:5055/docs?` let any request skip the
+  password. Exemptions now use the real ASGI path (`scope["path"]`) and
+  malformed `Host` headers are rejected with 400. Regression tests in
+  `tests/api/test_auth_security.py`.
+- **SSRF through redirects and DNS rebinding on source URLs.** The URL
+  pre-check only looked at the submitted URL, while content-core follows
+  redirects. New `open_notebook/utils/ssrf_guard.py` checks the address
+  of every connection content-core opens (first request and each
+  redirect hop) and refuses non-public destinations. Scoped to
+  content-core, so local model providers are unaffected. Tests in
+  `tests/test_ssrf_guard.py`.
+- **Source URLs no longer sent to r.jina.ai by default.** The ingestion
+  graph hard-coded content-core's `auto` URL engine, which forwards every
+  URL to Jina. Default is now `simple` (local download); external engines
+  are an explicit opt-in through `OPEN_NOTEBOOK_URL_ENGINE`.
 - **Container hardening** applied to both `surrealdb` and `open_notebook`
   services in both Compose files:
   - `security_opt: no-new-privileges:true`.
@@ -211,6 +248,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- **Upstream Claude workflows** (`.github/workflows/claude.yml`,
+  `claude-code-review.yml`). The review workflow ran on
+  `pull_request_target`, checked out the external PR's code and exposed
+  `CLAUDE_CODE_OAUTH_TOKEN` and `id-token: write` to it. The fork does
+  not use them.
 - **Tracking of local runtime and backup directories**
   (`deployment/windows/runtime/`, `deployment/windows/backups/`).
   These contain locally-generated credentials and must never reach

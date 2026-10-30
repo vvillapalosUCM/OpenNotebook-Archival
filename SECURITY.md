@@ -44,6 +44,14 @@ be a deployment mode the fork does not try to support.
   `::ffff:169.254.169.254`) are rejected. DNS resolution is re-checked
   to catch hostnames that resolve to link-local or private ranges
   unless `OPEN_NOTEBOOK_ALLOW_PRIVATE_SOURCE_URLS=true` is set.
+- **SSRF via source URLs.** Besides the pre-check on the submitted URL,
+  every download made by content-core is checked at connect time
+  (`open_notebook/utils/ssrf_guard.py`): the first request and each
+  redirect hop must reach a globally routable address, which also
+  defeats DNS rebinding.
+- **Host header poisoning** (CVE-2026-48710): authentication exemptions
+  are decided on the real ASGI path, and malformed `Host` headers are
+  rejected with 400.
 - **SurrealQL injection** through dynamic query building: interpolated
   identifiers and ORDER-BY clauses are validated against allowlists
   before insertion; user data uses parameterised queries.
