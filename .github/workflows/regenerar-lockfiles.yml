@@ -49,11 +49,28 @@ jobs:
           echo "::notice title=npm audit (prod)::$(npm audit --omit=dev --json | jq -c '.metadata.vulnerabilities')"
           echo "::notice title=npm audit (todo)::$(npm audit --json | jq -c '.metadata.vulnerabilities')"
 
-      - name: Commit de los lockfiles y retirada de este workflow
+      - name: Commit 1 - lockfiles (uv y npm audit fix)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm -q .github/workflows/regenerar-lockfiles.yml
           git add uv.lock frontend/package.json frontend/package-lock.json
-          git commit -m "deps: regenerar uv.lock y package-lock.json para cerrar alertas de seguridad"
-          git push origin HEAD:seguridad/lockfiles-2026-10
+          git commit -m "deps: regenerar uv.lock y package-lock.json (anyio, soupsieve, pyasn1, axios, form-data y otras con alertas)"
+
+      - name: Commit 2 - vitest 5 (corrige vitest y tinypool)
+        working-directory: frontend
+        run: |
+          if npm install --save-dev vitest@^5.0.5 @vitest/ui@^5.0.5; then
+            for p in vitest @vitest/ui tinypool; do
+              v=$(node -e "const l=require('./package-lock.json').packages;const k=Object.keys(l).filter(k=>k.endsWith('node_modules/'+process.argv[1]));console.log([...new Set(k.map(x=>l[x].version))].join(','))" "$p")
+              echo "::notice title=vitest5 ${p}::${v}"
+            done
+            echo "::notice title=npm audit tras vitest 5::$(npm audit --json | jq -c '.metadata.vulnerabilities')"
+            git add package.json package-lock.json
+            git commit -m "deps(dev): vitest y @vitest/ui 3 -> 5 (alertas criticas de vitest y tinypool)"
+          else
+            git checkout -- package.json package-lock.json
+            echo "::warning title=vitest5::npm install de vitest 5 ha fallado; se deja vitest 3"
+          fi
+
+      - name: Push
+        run: git push origin HEAD:seguridad/lockfiles-2026-10
