@@ -159,6 +159,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Frontend lockfile pinned to the official npm registry.**
+  `frontend/package-lock.json` resolved 140 packages (6 of them shipped to
+  users: `i18next`, `react-i18next`, `i18next-browser-languagedetector`,
+  `html-parse-stringify`, `use-sync-external-store`, `void-elements`) from
+  the third-party mirror `registry.npmmirror.com`, inherited from upstream
+  PR #371. Every `integrity` hash was checked against `registry.npmjs.org`
+  before the change: 140/140 match, so no package was tampered with. Only
+  the `resolved` URLs change; versions and hashes are untouched. A new
+  `frontend/.npmrc` pins `registry=https://registry.npmjs.org/` so a mirror
+  configured on a contributor's machine cannot leak back into the lockfile.
+
 - **Pillow forced to >= 13.0.0** through `[tool.uv] override-dependencies`.
   The locked Pillow 11.3.0 carries 4 critical and 35 high advisories, and
   Dependabot could not upgrade it because moviepy 2.2.1 (pulled in by
