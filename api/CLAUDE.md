@@ -93,14 +93,14 @@ FastAPI application serving three architectural layers: routes (HTTP endpoints),
 ## Important Quirks & Gotchas
 
 - **Migration auto-run**: Database schema migrations run on every API startup (via lifespan); no manual migration steps
-- **PasswordAuthMiddleware is basic**: Uses simple password check; production deployments should replace with OAuth/JWT
+- **PasswordAuthMiddleware is a single shared password**: designed for one person on one computer; the API refuses to start without it or with a placeholder/weak value (see `open_notebook/utils/secret_policy.py`)
 - **No request rate limiting**: No built-in rate limiting; deployment must add via proxy/middleware
 - **Service state is stateless**: Services don't cache results; each request re-queries database/AI models
 - **Graph invocation is blocking**: chat/podcast workflows may take minutes; no timeout handling in services
 - **Command job fire-and-forget**: podcast_service.py submits jobs but doesn't wait (async job queue pattern)
 - **Model override scoping**: Model config override via RunnableConfig is per-request only (not persistent)
-- **CORS open by default**: main.py CORS settings allow all origins (restrict before production)
-- **No OpenAPI security scheme**: API docs available without auth (disable before production)
+- **CORS restricted by default**: only `http://localhost:8502` and `http://127.0.0.1:8502` unless `OPEN_NOTEBOOK_ALLOWED_ORIGINS` is set
+- **API docs disabled by default**: `/docs`, `/redoc` and `/openapi.json` return 404 unless `OPEN_NOTEBOOK_PUBLIC_DOCS=true`; when enabled they are served without authentication and a warning is logged
 - **Services don't validate user permission**: All endpoints trust authentication layer; no per-notebook permission checks
 
 ## Error Handling
@@ -139,11 +139,11 @@ The frontend `getApiErrorMessage()` helper (`lib/utils/error-handler.ts`) tries 
 3. Create service in `new_feature_service.py` with business logic
 4. Define request/response schemas in `models.py` (or create `new_feature_models.py`)
 5. Implement router functions calling service methods
-6. Test with `uv run uvicorn api.main:app --host 0.0.0.0 --port 5055`
+6. Test with `uv run uvicorn api.main:app --host 127.0.0.1 --port 5055`
 
 ## Testing Patterns
 
-- **Interactive docs**: http://localhost:5055/docs (Swagger UI)
+- **Interactive docs**: http://localhost:5055/docs (Swagger UI; only with `OPEN_NOTEBOOK_PUBLIC_DOCS=true`)
 - **Direct service tests**: Import service, call methods directly with test data
 - **Mock graphs**: Replace graph.ainvoke() with mock for testing service logic
 - **Database: Use test database** (separate SurrealDB instance or mock repo_query)
@@ -210,7 +210,7 @@ No changes to authentication. The `credentials` router uses the same `PasswordAu
 
 **Auth Flow** (unchanged from `api/auth.py`):
 - `PasswordAuthMiddleware`: Global middleware checking `Authorization: Bearer {password}` header
-- Default password: `open-notebook-change-me` (set `OPEN_NOTEBOOK_PASSWORD` in production)
+- No default password: `OPEN_NOTEBOOK_PASSWORD` is required, and template or weak values are rejected at startup
 - Docker secrets support via `OPEN_NOTEBOOK_PASSWORD_FILE`
 
 ### Connection Testing (`open_notebook/ai/connection_tester.py`)

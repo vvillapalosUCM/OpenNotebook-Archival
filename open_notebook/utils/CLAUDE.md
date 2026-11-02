@@ -193,6 +193,11 @@ for item in context_items:
     print(f"{item.type}:{item.id} ({item.token_count} tokens)")
 ```
 
+### secret_policy.py
+- **classify_secret(value)**: Returns `"placeholder"`, `"weak"`, `"short"` or `None` for a secret value
+- Used by `api/main.py` at startup: placeholder or weak `OPEN_NOTEBOOK_PASSWORD` / `OPEN_NOTEBOOK_ENCRYPTION_KEY` stop the API; a placeholder `SURREAL_PASSWORD` stops it, a weak one only warns
+- When adding a new example secret to docs or templates, check that `classify_secret` flags it
+
 ### encryption.py
 - **get_secret_from_env(var_name)**: Retrieve secret from environment with Docker secrets support (checks VAR_FILE first, then VAR)
 - **get_fernet()**: Get Fernet instance if encryption key is configured
@@ -223,6 +228,7 @@ encrypted_api_key = encrypt_value(api_key)
 # Decrypt when reading from database
 decrypted_api_key = decrypt_value(encrypted_api_key)
 
-# Set any string as encryption key:
-# OPEN_NOTEBOOK_ENCRYPTION_KEY=my-secret-passphrase
+# Set a long random string as encryption key (template or weak values are
+# rejected at API startup, see secret_policy.py):
+# OPEN_NOTEBOOK_ENCRYPTION_KEY=$(openssl rand -base64 32)
 ```

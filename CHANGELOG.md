@@ -159,6 +159,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Placeholder and well-known weak secrets are rejected at startup.** The
+  API refuses to start when `OPEN_NOTEBOOK_PASSWORD` or
+  `OPEN_NOTEBOOK_ENCRYPTION_KEY` is still a value from a template or the
+  documentation (`CHANGE_ME_…`, `⚠️_CAMBIAR_ESTO_…`, `your-secret-key`,
+  `my-secret-passphrase`…) or a well-known weak value (`admin`, `root`,
+  `password123`…), including values read from `*_FILE` Docker secrets. A
+  placeholder `SURREAL_PASSWORD` is also fatal; a weak one only logs a
+  warning, since the database is normally reachable only inside Docker.
+  Values shorter than 12 characters log a warning. Logic in
+  `open_notebook/utils/secret_policy.py`, tests in
+  `tests/api/test_secret_policy.py`. Changing an encryption key that was a
+  placeholder means provider API keys stored in the database must be
+  entered again.
+- **Startup warning when API docs are public.** With
+  `OPEN_NOTEBOOK_PUBLIC_DOCS=true`, `/docs`, `/redoc` and `/openapi.json`
+  are served without authentication; the API now logs a warning saying so.
+- **Example Compose files aligned with the hardened setup.**
+  `examples/docker-compose-{ollama,speaches,full-local}.yml` no longer
+  hard-code `root/root` or `change-me-to-a-secret-string`, no longer publish
+  SurrealDB, publish every other port on `127.0.0.1` only, read secrets from
+  `.env` (Compose stops if one is missing) and build the image from this
+  repository instead of pulling `lfnovo/open_notebook`. Speaches is reached
+  as `http://speaches:8000/v1` inside Docker. `docker-compose-dev.yml` and
+  `docker-compose-single.yml` publish on `127.0.0.1` only. The examples
+  README no longer suggests `BASIC_AUTH_*` variables, which this project
+  never read.
+- **Assistant context files describe the real security model.** The
+  `CLAUDE.md` files no longer mention a default password
+  (`open-notebook-change-me`), `--host 0.0.0.0`, open CORS or public API
+  docs, none of which match this fork; they now state the fail-closed
+  behaviour and that defaults, example secrets and `0.0.0.0` bindings must
+  not be added.
+
 - **Frontend lockfile pinned to the official npm registry.**
   `frontend/package-lock.json` resolved 140 packages (6 of them shipped to
   users: `i18next`, `react-i18next`, `i18next-browser-languagedetector`,

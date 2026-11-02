@@ -14,10 +14,11 @@ This folder contains different `docker-compose.yml` configurations for various u
 - Perfect for privacy, offline work, or air-gapped environments
 
 **Setup:**
-1. Copy to your project folder as `docker-compose.yml`
-2. Run: `docker compose up -d`
-3. Download models (see file comments for commands)
-4. Configure all providers in UI (detailed instructions in file)
+1. Copy to the repository root as `docker-compose.yml`
+2. Copy `.env.example` to `.env` and replace every `CHANGE_ME` value with a long random string (the API refuses to start with template or weak values)
+3. Run: `docker compose up -d --build`
+4. Download models (see file comments for commands)
+5. Configure all providers in UI (detailed instructions in file)
 
 **Requirements:**
 - Minimum: 8GB RAM, 20GB disk, 4 CPU cores
@@ -39,10 +40,11 @@ This folder contains different `docker-compose.yml` configurations for various u
 - Private audio processing
 
 **Setup:**
-1. Copy to your project folder as `docker-compose.yml`
-2. Run: `docker compose up -d`
-3. Download speech models (see file for commands)
-4. Configure cloud LLM + local Speaches in UI
+1. Copy to the repository root as `docker-compose.yml`
+2. Copy `.env.example` to `.env` and replace every `CHANGE_ME` value with a long random string (the API refuses to start with template or weak values)
+3. Run: `docker compose up -d --build`
+4. Download speech models (see file for commands)
+5. Configure cloud LLM + local Speaches in UI
 
 **Documentation:**
 - [Local TTS Guide](../docs/5-CONFIGURATION/local-tts.md)
@@ -60,10 +62,11 @@ This folder contains different `docker-compose.yml` configurations for various u
 - Great for testing or privacy-focused deployments
 
 **Setup:**
-1. Copy to your project folder as `docker-compose.yml`
-2. Run: `docker compose up -d`
-3. Pull a model: `docker exec open_notebook-ollama-1 ollama pull mistral`
-4. Configure in UI: Settings → API Keys → Add Ollama (URL: `http://ollama:11434`)
+1. Copy to the repository root as `docker-compose.yml`
+2. Copy `.env.example` to `.env` and replace every `CHANGE_ME` value with a long random string (the API refuses to start with template or weak values)
+3. Run: `docker compose up -d --build`
+4. Pull a model: `docker compose exec ollama ollama pull mistral`
+5. Configure in UI: Settings → API Keys → Add Ollama (URL: `http://ollama:11434`)
 
 **Recommended models:**
 - **LLM**: `mistral`, `llama3.1`, `qwen2.5`
@@ -109,11 +112,17 @@ See [Development Guide](../docs/7-DEVELOPMENT/index.md)
    ```bash
    cp examples/docker-compose-ollama.yml docker-compose.yml
    ```
-3. **Edit** the `OPEN_NOTEBOOK_ENCRYPTION_KEY` value
+3. **Create** `.env` from `.env.example` and replace every `CHANGE_ME` value
+   with a long random string (for example `openssl rand -base64 32`).
+   The API refuses to start with template or well-known weak values.
 4. **Run** the services:
    ```bash
-   docker compose up -d
+   docker compose up -d --build
    ```
+
+All examples publish ports on `127.0.0.1` only. Do not change that to
+`0.0.0.0` or remove the address: this project is designed for use on the
+same computer, not as a network service.
 
 ---
 
@@ -128,10 +137,10 @@ Add this to the main `docker-compose.yml`:
   ollama:
     image: ollama/ollama:latest
     ports:
-      - "11434:11434"
+      - "127.0.0.1:11434:11434"
     volumes:
       - ollama_models:/root/.ollama
-    restart: always
+    restart: unless-stopped
 
 volumes:
   ollama_models:
@@ -140,12 +149,10 @@ volumes:
 ### Add Reverse Proxy
 See [Reverse Proxy Guide](../docs/5-CONFIGURATION/reverse-proxy.md)
 
-### Add Basic Auth
-Add to `open_notebook` service environment:
-```yaml
-- BASIC_AUTH_USERNAME=admin
-- BASIC_AUTH_PASSWORD=your-secure-password
-```
+### Authentication
+The API always requires `OPEN_NOTEBOOK_PASSWORD` (set it in `.env`). There is
+no separate basic-auth layer: variables such as `BASIC_AUTH_USERNAME` are not
+read by this project.
 
 ---
 
