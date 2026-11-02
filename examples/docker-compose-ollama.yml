@@ -3,61 +3,92 @@
 # This setup includes Ollama for running local AI models without API costs.
 # Great for privacy-focused deployments or testing without cloud dependencies.
 #
+# For most installations the hardened docker-compose.yml in the repository
+# root is the recommended starting point. This example adds an Ollama
+# container to the same security model:
+#   - every published port listens on 127.0.0.1 only;
+#   - SurrealDB has no published port (reachable only inside Docker);
+#   - all secrets come from .env and Compose stops if one is missing;
+#   - the image is built from this repository, not pulled from upstream.
+#
+# Upgrading from an earlier version of this example: SurrealDB keeps the
+# root user it was first started with. If your ./surreal_data was created
+# with root/root, set SURREAL_ROOT_USER=root and SURREAL_ROOT_PASSWORD=root
+# in .env to start, then change that password inside SurrealDB.
+# Earlier versions ran the upstream image with ./notebook_data; this one
+# uses the named volume notebook_data, so that folder is not reused.
+#
 # Usage:
-#   1. Copy this file to your project folder as docker-compose.yml
-#   2. Change OPEN_NOTEBOOK_ENCRYPTION_KEY below
-#   3. Run: docker compose up -d
-#   4. Pull a model: docker exec open_notebook-ollama-1 ollama pull mistral
+#   1. Copy this file to the repository root as docker-compose.yml
+#   2. Copy .env.example to .env and replace every CHANGE_ME value with a
+#      long random string (for example: openssl rand -base64 32).
+#      The API refuses to start with template or weak values.
+#   3. Run: docker compose up -d --build
+#   4. Pull a model: docker compose exec ollama ollama pull mistral
 #   5. Configure Ollama in UI: Settings → API Keys → Add Ollama (URL: http://ollama:11434)
 
 services:
   surrealdb:
     image: surrealdb/surrealdb:v2
-    command: start --log info --user root --pass root rocksdb:/mydata/mydatabase.db
     user: root
-    ports:
-      - "8000:8000"
+    command: >-
+      start
+      --log warn
+      --user ${SURREAL_ROOT_USER:?Set SURREAL_ROOT_USER in .env}
+      --pass ${SURREAL_ROOT_PASSWORD:?Set SURREAL_ROOT_PASSWORD in .env}
+      --bind 0.0.0.0:8000
+      rocksdb:/mydata/mydatabase.db
+    # No published ports: reachable only as surrealdb:8000 inside Docker.
     volumes:
       - ./surreal_data:/mydata
     environment:
-      - SURREAL_EXPERIMENTAL_GRAPHQL=true
-    restart: always
-    pull_policy: always
+      - SURREAL_EXPERIMENTAL_GRAPHQL=false
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
 
   ollama:
     image: ollama/ollama:latest
     ports:
-      - "11434:11434"
+      - "127.0.0.1:11434:11434"
     volumes:
       - ollama_models:/root/.ollama
-    restart: always
-    pull_policy: always
+    restart: unless-stopped
 
   open_notebook:
-    image: lfnovo/open_notebook:v1-latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: opennotebook-archival:local
+    pull_policy: never
     ports:
-      - "8502:8502"
-      - "5055:5055"
+      - "127.0.0.1:${FRONTEND_PORT:-8502}:8502"
+      - "127.0.0.1:${API_PORT:-5055}:5055"
+    env_file:
+      - .env
     environment:
-      # REQUIRED: Change this to your own secret string
-      - OPEN_NOTEBOOK_ENCRYPTION_KEY=change-me-to-a-secret-string
+      # Required secrets (read from .env; Compose stops if one is missing)
+      - OPEN_NOTEBOOK_PASSWORD=${OPEN_NOTEBOOK_PASSWORD:?Set OPEN_NOTEBOOK_PASSWORD in .env}
+      - OPEN_NOTEBOOK_ENCRYPTION_KEY=${OPEN_NOTEBOOK_ENCRYPTION_KEY:?Set OPEN_NOTEBOOK_ENCRYPTION_KEY in .env}
 
-      # Database connection
+      # Database connection (internal Docker network)
       - SURREAL_URL=ws://surrealdb:8000/rpc
-      - SURREAL_USER=root
-      - SURREAL_PASSWORD=root
-      - SURREAL_NAMESPACE=open_notebook
-      - SURREAL_DATABASE=open_notebook
+      - SURREAL_USER=${SURREAL_ROOT_USER}
+      - SURREAL_PASSWORD=${SURREAL_ROOT_PASSWORD}
+      - SURREAL_NAMESPACE=${SURREAL_NAMESPACE:-open_notebook}
+      - SURREAL_DATABASE=${SURREAL_DATABASE:-open_notebook}
 
       # Ollama connection
       - OLLAMA_BASE_URL=http://ollama:11434
     volumes:
-      - ./notebook_data:/app/data
+      - notebook_data:/app/data  # named volume: the image runs as a non-root user
     depends_on:
       - surrealdb
       - ollama
-    restart: always
-    pull_policy: always
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
 
 volumes:
+  notebook_data:
   ollama_models:

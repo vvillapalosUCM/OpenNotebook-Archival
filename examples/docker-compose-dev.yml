@@ -1,3 +1,6 @@
+# Development setup. Every port listens on 127.0.0.1 only.
+# SurrealDB uses root/root here for convenience: never publish port 8000
+# beyond 127.0.0.1 or reuse this file outside a development machine.
 services:
   surrealdb:
     image: surrealdb/surrealdb:v2
@@ -6,7 +9,7 @@ services:
     environment:
       - SURREAL_EXPERIMENTAL_GRAPHQL=true
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     command: start --log info --user root --pass root rocksdb:/mydata/mydatabase.db
     pull_policy: always
     user: root
@@ -16,8 +19,8 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8502:8502"
-      - "5055:5055"
+      - "127.0.0.1:8502:8502"
+      - "127.0.0.1:5055:5055"
     env_file:
       - ./docker.env
     depends_on:

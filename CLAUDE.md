@@ -110,8 +110,9 @@ User documentation is at @docs/
 - **Transactions**: Repo functions handle ACID operations
 
 ### 5. Authentication
-- **Current**: Simple password middleware (insecure, dev-only)
-- **Production**: Replace with OAuth/JWT (see CONFIGURATION.md)
+- **Current**: Single shared password (`Authorization: Bearer <OPEN_NOTEBOOK_PASSWORD>`) with temporary lockout after repeated failed attempts; designed for one person on one computer, not for multi-user or network deployments
+- **Fail-closed startup**: the API refuses to start without `OPEN_NOTEBOOK_PASSWORD`, or when it or `OPEN_NOTEBOOK_ENCRYPTION_KEY` is a template placeholder or well-known weak value (`open_notebook/utils/secret_policy.py`). `OPEN_NOTEBOOK_ALLOW_NO_PASSWORD=true` disables authentication for local development only
+- **Never** add default passwords, example secrets or `0.0.0.0` bindings to code, compose files or docs
 
 ---
 
@@ -124,7 +125,7 @@ User documentation is at @docs/
 
 ### Frontend-Backend Communication
 - **Base API URL**: Configured in `.env.local` (default: http://localhost:5055)
-- **CORS enabled**: Configured in `api/main.py` (allow all origins in dev)
+- **CORS**: `OPEN_NOTEBOOK_ALLOWED_ORIGINS`; defaults to `http://localhost:8502` and `http://127.0.0.1:8502` only
 - **Rate limiting**: Not built-in; add at proxy layer for production
 
 ### LangGraph Workflows
@@ -185,7 +186,7 @@ See dedicated CLAUDE.md files for detailed guidance:
 2. Create service in `api/feature_service.py`
 3. Define schemas in `api/models.py`
 4. Register router in `api/main.py`
-5. Test via http://localhost:5055/docs
+5. Test via http://localhost:5055/docs (disabled by default; set `OPEN_NOTEBOOK_PUBLIC_DOCS=true` temporarily, and it is served without authentication)
 
 ### Add a New LangGraph Workflow
 1. Create `open_notebook/graphs/workflow_name.py`

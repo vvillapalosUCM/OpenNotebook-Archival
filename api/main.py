@@ -49,6 +49,7 @@ from api.routers import (
 from api.routers import commands as commands_router
 from open_notebook.database.async_migrate import AsyncMigrationManager
 from open_notebook.utils.encryption import get_secret_from_env
+from open_notebook.utils.secret_policy import MIN_RECOMMENDED_LENGTH, classify_secret
 
 # Import commands to register them in the API process
 try:
@@ -77,6 +78,53 @@ def _get_allowed_origins() -> list[str]:
 
 ALLOWED_ORIGINS = _get_allowed_origins()
 PUBLIC_DOCS = _env_flag("OPEN_NOTEBOOK_PUBLIC_DOCS", "false")
+
+
+def _check_secret_values() -> None:
+    """Refuse to start with secrets copied from templates or documentation.
+
+    The API password and the encryption key must not be placeholders or
+    well-known weak values: anyone who has read this repository knows them.
+    For the database password only template placeholders are fatal; weak
+    values such as "root" produce a warning, because the database is normally
+    reachable only inside the Docker network.
+    """
+    problems: list[str] = []
+
+    for var, label in (
+        ("OPEN_NOTEBOOK_PASSWORD", "API password"),
+        ("OPEN_NOTEBOOK_ENCRYPTION_KEY", "encryption key"),
+    ):
+        issue = classify_secret(get_secret_from_env(var))
+        if issue in ("placeholder", "weak"):
+            problems.append(
+                f"{var} ({label}) is set to a {'template placeholder' if issue == 'placeholder' else 'well-known weak value'}."
+            )
+        elif issue == "short":
+            logger.warning(
+                f"{var} ({label}) is shorter than {MIN_RECOMMENDED_LENGTH} characters. "
+                "Use a longer random value."
+            )
+
+    db_password = os.getenv("SURREAL_PASSWORD") or os.getenv("SURREAL_PASS")
+    db_issue = classify_secret(db_password)
+    if db_issue == "placeholder":
+        problems.append("SURREAL_PASSWORD (database password) is set to a template placeholder.")
+    elif db_issue in ("weak", "short"):
+        logger.warning(
+            "SURREAL_PASSWORD (database password) is weak. This is only acceptable "
+            "while the database port is not published outside the Docker network."
+        )
+
+    if problems:
+        raise RuntimeError(
+            "Refusing to start: "
+            + " ".join(problems)
+            + " Replace these values in your .env file with long random strings "
+            "(for example: openssl rand -base64 32). If you change "
+            "OPEN_NOTEBOOK_ENCRYPTION_KEY, provider API keys already stored in the "
+            "database can no longer be decrypted and must be entered again."
+        )
 
 
 def _get_request_origin(request: Request) -> str | None:
@@ -122,12 +170,22 @@ async def lifespan(app: FastAPI):
     # Startup: Security checks
     logger.info("Starting API initialization...")
 
+    # Security check: placeholder or well-known weak secrets (fail-closed)
+    _check_secret_values()
+
     # Security check: Encryption key
     if not get_secret_from_env("OPEN_NOTEBOOK_ENCRYPTION_KEY"):
         logger.warning(
             "OPEN_NOTEBOOK_ENCRYPTION_KEY not set. "
             "API key encryption will fail until this is configured. "
             "Set OPEN_NOTEBOOK_ENCRYPTION_KEY to any secret string."
+        )
+
+    if PUBLIC_DOCS:
+        logger.warning(
+            "OPEN_NOTEBOOK_PUBLIC_DOCS=true: /docs, /redoc and /openapi.json are "
+            "served WITHOUT authentication and describe every API endpoint. "
+            "Set it back to false when you no longer need them."
         )
 
     # Security check: Authentication password (fail-closed)

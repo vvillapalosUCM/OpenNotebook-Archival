@@ -5,8 +5,8 @@ services:
       context: .
       dockerfile: Dockerfile.single
     ports:
-      - "8502:8502"  # Next.js Frontend
-      - "5055:5055"  # REST API
+      - "127.0.0.1:8502:8502"  # Next.js Frontend (this computer only)
+      - "127.0.0.1:5055:5055"  # REST API (this computer only)
     env_file:
       - ./docker.env
     environment:
@@ -20,4 +20,4 @@ services:
     # Access:
     # - Next.js UI: http://localhost:8502
     # - REST API: http://localhost:5055
-    # - API Documentation: http://localhost:5055/docs
+    # - API Documentation: http://localhost:5055/docs (only if OPEN_NOTEBOOK_PUBLIC_DOCS=true)
