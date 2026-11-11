@@ -36,6 +36,44 @@ def _env_bool(name: str, default: bool = False) -> bool:
 # request.url from Host, so a value like "localhost:5055/docs?" poisoned
 # request.url.path (CVE-2026-48710 / GHSA-86qp-5c8j-p5mr) and let any request
 # match a public path. Such headers are rejected outright.
+def secrets_match(candidate: Optional[str], expected: Optional[str]) -> bool:
+    """Constant-time comparison that also works for non-ASCII secrets.
+
+    ``hmac.compare_digest`` raises ``TypeError`` when given ``str`` values
+    containing non-ASCII characters, so a password such as ``contraseña`` or
+    ``Árbol-2026`` turned every authenticated request into a 500. Both sides
+    are compared as bytes instead.
+
+    HTTP header values reach us decoded as latin-1. A browser sends ``ñ`` as
+    the single byte 0xF1, while curl and most API clients send its UTF-8
+    bytes; both spellings of the same password are accepted.
+    """
+    if not candidate or not expected:
+        return False
+    expected_bytes = expected.encode("utf-8")
+    matched = hmac.compare_digest(candidate.encode("utf-8"), expected_bytes)
+    try:
+        wire_bytes = candidate.encode("latin-1")
+    except UnicodeEncodeError:
+        wire_bytes = b""
+    # Evaluated unconditionally so both paths cost the same.
+    matched_wire = hmac.compare_digest(wire_bytes, expected_bytes)
+    return matched or matched_wire
+
+
+# Values shipped in .env.example / .env.hardened. Anyone can read them in the
+# public repository, so a deployment still using one has no real password.
+_PLACEHOLDER_MARKERS = ("CHANGE_ME", "CAMBIAR_ESTO")
+
+
+def is_placeholder_secret(value: Optional[str]) -> bool:
+    """True when ``value`` is one of the example secrets from the templates."""
+    if not value:
+        return False
+    upper = value.upper()
+    return any(marker in upper for marker in _PLACEHOLDER_MARKERS)
+
+
 _HOST_HEADER_RE = re.compile(
     r"^(?:[A-Za-z0-9_](?:[A-Za-z0-9_.\-]*[A-Za-z0-9_])?|\[[0-9A-Fa-f:.]+\])(?::[0-9]{1,5})?$"
 )
@@ -65,12 +103,17 @@ class PasswordAuthMiddleware(BaseHTTPMiddleware):
     - constant-time password comparison;
     - simple in-memory rate limiting per client IP;
     - optional temporary blocking after repeated failures;
-    - optional trust of proxy headers only when explicitly enabled.
+    - optional trust of proxy headers only when explicitly enabled;
+    - passwords with non-ASCII characters are compared as bytes;
+    - the example passwords from the .env templates are refused;
+    - requests without credentials are answered 401 but do not count towards
+      the lockout (only wrong credentials do).
     """
 
     def __init__(self, app, excluded_paths: Optional[list] = None):
         super().__init__(app)
         self.password = get_secret_from_env("OPEN_NOTEBOOK_PASSWORD")
+        self.password_is_placeholder = is_placeholder_secret(self.password)
         self.excluded_paths = excluded_paths or [
             "/",
             "/health",
@@ -134,6 +177,19 @@ class PasswordAuthMiddleware(BaseHTTPMiddleware):
         if request.method == "OPTIONS":
             return await call_next(request)
 
+        if self.password_is_placeholder:
+            # The configured password is the public example value from the
+            # .env templates: refuse to serve protected data until it is changed.
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "detail": (
+                        "OPEN_NOTEBOOK_PASSWORD still holds the example value from "
+                        "the .env template. Set a real password and restart."
+                    )
+                },
+            )
+
         client_ip = self._client_ip(request)
         now = time.time()
         self._prune_old_attempts(client_ip, now)
@@ -149,8 +205,10 @@ class PasswordAuthMiddleware(BaseHTTPMiddleware):
 
         auth_header = request.headers.get("Authorization")
         if not auth_header:
-            self._record_failure(client_ip, now)
-            await asyncio.sleep(self.failure_delay_ms / 1000)
+            # Not a password guess: do not count it towards the lockout.
+            # Behind Docker every client shares one source IP, so counting
+            # these let any web page lock the legitimate user out simply by
+            # firing unauthenticated requests at the API.
             return JSONResponse(
                 status_code=401,
                 content={"detail": "Missing authorization header"},
@@ -170,7 +228,7 @@ class PasswordAuthMiddleware(BaseHTTPMiddleware):
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-        if not hmac.compare_digest(credentials, self.password):
+        if not secrets_match(credentials, self.password):
             self._record_failure(client_ip, now)
             await asyncio.sleep(self.failure_delay_ms / 1000)
             return JSONResponse(
@@ -207,7 +265,7 @@ def check_api_password(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    if not hmac.compare_digest(credentials.credentials, password):
+    if is_placeholder_secret(password) or not secrets_match(credentials.credentials, password):
         raise HTTPException(
             status_code=401,
             detail="Invalid password",

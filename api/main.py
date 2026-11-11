@@ -13,7 +13,7 @@ from loguru import logger
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from api.auth import PasswordAuthMiddleware
+from api.auth import PasswordAuthMiddleware, is_placeholder_secret
 from open_notebook.exceptions import (
     AuthenticationError,
     ConfigurationError,
@@ -130,7 +130,21 @@ async def lifespan(app: FastAPI):
             "Set OPEN_NOTEBOOK_ENCRYPTION_KEY to any secret string."
         )
 
+    elif is_placeholder_secret(get_secret_from_env("OPEN_NOTEBOOK_ENCRYPTION_KEY")):
+        logger.critical(
+            "OPEN_NOTEBOOK_ENCRYPTION_KEY still holds the example value from the "
+            ".env template, which is public. Stored API keys are effectively "
+            "unprotected. Set a long random value (existing credentials must be "
+            "re-entered after changing it)."
+        )
+
     # Security check: Authentication password (fail-closed)
+    if is_placeholder_secret(get_secret_from_env("OPEN_NOTEBOOK_PASSWORD")):
+        logger.critical(
+            "OPEN_NOTEBOOK_PASSWORD still holds the example value from the .env "
+            "template. Protected endpoints will answer 503 until a real password "
+            "is configured."
+        )
     if not get_secret_from_env("OPEN_NOTEBOOK_PASSWORD"):
         if _env_flag("OPEN_NOTEBOOK_ALLOW_NO_PASSWORD", "false"):
             logger.critical(

@@ -93,11 +93,27 @@ function Set-IfMissing($Map, [string]$Key, [string]$Value) {
 }
 
 function New-RandomSecret([int]$Length = 48) {
-    $chars = @()
-    $chars += 48..57
-    $chars += 65..90
-    $chars += 97..122
-    return -join ((1..$Length) | ForEach-Object { [char]($chars | Get-Random) })
+    # Generador criptografico del sistema. Get-Random no garantiza
+    # aleatoriedad apta para secretos en Windows PowerShell 5.1.
+    $alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+    # Se descartan los bytes >= 248 (62 * 4) para no sesgar el reparto.
+    $limit = 256 - (256 % $alphabet.Length)
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    $buffer = New-Object byte[] 64
+    $result = New-Object System.Text.StringBuilder
+    try {
+        while ($result.Length -lt $Length) {
+            $rng.GetBytes($buffer)
+            foreach ($b in $buffer) {
+                if ($b -lt $limit -and $result.Length -lt $Length) {
+                    [void]$result.Append($alphabet[$b % $alphabet.Length])
+                }
+            }
+        }
+    } finally {
+        $rng.Dispose()
+    }
+    return $result.ToString()
 }
 
 function Convert-HostUrlToContainerUrl([string]$Url) {
